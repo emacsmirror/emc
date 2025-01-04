@@ -1,0 +1,11 @@
+*~
+*elc
+*.o
+*.dylib
+*.dll
+*.so
+tmp/*
+
+platel_test
+platel_build/*
+
