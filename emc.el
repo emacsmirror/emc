@@ -182,6 +182,8 @@ variable KEYS collects the arguments to pass to the latter function."
   )
 
 
+;; Generic API exported functions.
+
 (cl-defun emc::invoke-make (make-cmd)
   "Call the MAKE-CMD in an inferior shell process."
 
@@ -210,18 +212,32 @@ variable KEYS collects the arguments to pass to the latter function."
     ))
 
 
-;; Exported functions.
+(cl-defun emc:make (&rest keys
+                          &key
+                          (makefile "Makefile")
+                          (make-macros "")
+                          (targets "")
+                          &allow-other-keys)
+  "Call a 'make' program in a platform dependend way.
 
-(cl-defun emc:make ()
-  "Call a 'make' program in a platform dependend way."
+KEYS contains the keyword arguments passed to the specialized
+'emc:X-make-cmd' functions;  MAKEFILE is the name of the makefile to
+use (defaults to \"Makefile\"); MAKE-MACROS is a string containing
+'MACRO=DEF' definitions; TARGETS is a string of Makefile targets."
+
+  (message "EMC: making with:")
+  (message "EMC: makefile:    %S" makefile)
+  (message "EMC: make-macros: %S" make-macros)
+  (message "EMC: targets:     %S" targets)
+  (message "EMC: making...")
   
   (cl-case system-type
     (windows-nt
-     (emc::invoke-make (emc:msvc-make-cmd)))
+     (emc::invoke-make (apply #'emc:msvc-make-cmd keys)))
     (darwin
-     (emc::invoke-make (emc:macos-make-cmd)))
+     (emc::invoke-make (apply #'emc:macos-make-cmd keys)))
     (otherwise                          ; Generic UNIX/Linux.
-     (emc::invoke-make (emc:unix-make-cmd)))
+     (emc::invoke-make (apply #'emc:unix-make-cmd keys)))
     )
   )
 
