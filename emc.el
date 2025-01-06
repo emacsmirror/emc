@@ -124,15 +124,16 @@ The web link is from 2025-01-03.  It may need some tweaking."
      (nologo t)
      (targets "")
      &allow-other-keys)
-  "Return the 'nmake' command (a string) to execute.
+  "Return the \\='nmake\\=' command (a string) to execute.
 
-The 'nmake' command is prepended by the necessary MSVC setup done by
-`emc:msc-vcvarsall-cmd'.  The variables MSVC-INSTALLATION (keyword
-:INSTALLATION) and MSVC-VCVARS-BAT (keyword :VCVARS-BAT) are
-passed to `emc:msc-vcvarsall-cmd'; `make-macros' is a string
-containing MACRO=DEF definitions; NOLOGO specifies whether or not to
-pass the '/NOLOGO' flag to 'nmake'; finally TARGETS is a string of
-makefile targets."
+The \\='nmake\\=' command is prepended by the necessary MSVC
+setup done by `emc:msc-vcvarsall-cmd'.  The variables
+:INSTALLATION (keyword variable MSVC-INSTALLATION) and
+:VCVARS-BAT (keyword variable MSVC-VCVARS-BAT) are passed to
+`emc:msc-vcvarsall-cmd'; MAKE-MACROS is a string containing
+MACRO=DEF definitions; NOLOGO specifies whether or not to pass
+the \\='/NOLOGO\\=' flag to \\='nmake\\='; finally TARGETS is a
+string of makefile targets."
 
   (concat "("
           (shell-quote-argument
@@ -154,11 +155,11 @@ makefile targets."
                              (make-macros "" make-macros-p)
                              (targets "")
                              &allow-other-keys)
-  "Return the 'make' command (a string) to execute.
+  "Return the \\='make\\=' command (a string) to execute.
 
-MAKEFILE is the 'Makefile' to pass to 'make' via the '-f' flag;
-MAKE-MACROS is a string containing 'MACRO=DEF' definitions; TARGETS is
-a string of Makefile targets."
+MAKEFILE is the \\='Makefile\\=' to pass to \\='make\\=' via the
+\\='-f\\=' flag; MAKE-MACROS is a string containing 'MACRO=DEF'
+definitions; TARGETS is a string of Makefile targets."
 
   (concat "make "
           (when makefile-p (format "-f %s " (shell-quote-argument makefile)))
@@ -170,14 +171,16 @@ a string of Makefile targets."
 ;; Mac OS definitions.
 
 (cl-defun emc:macos-make-cmd (&rest keys &key &allow-other-keys)
-  "Return the 'make' command (a string) to execute.
+  "Return the \\='make\\=' command (a string) to execute.
 
-MAKEFILE is the 'Makefile' to pass to 'make' via the '-f' flag;
-MAKE-MACROS is a string containing 'MACRO=DEF' definitions; TARGETS is
-a string of Makefile targets.
+MAKEFILE is the \\='Makefile\\=' to pass to \\='make\\=' via the
+\\='-f\\=' flag; MAKE-MACROS is a string containing
+\\='MACRO=DEF\\=' definitions; TARGETS is a string of Makefile
+targets.
 
-This function is essentially an alias for `emc:unix-make-cmd'.  The
-variable KEYS collects the arguments to pass to the latter function."
+This function is essentially an alias for `emc:unix-make-cmd'.
+The variable KEYS collects the arguments to pass to the latter
+function."
   (apply #'emc:macos-make-cmd keys)
   )
 
@@ -218,12 +221,13 @@ variable KEYS collects the arguments to pass to the latter function."
                           (make-macros "")
                           (targets "")
                           &allow-other-keys)
-  "Call a 'make' program in a platform dependend way.
+  "Call a \\='make\\=' program in a platform dependend way.
 
 KEYS contains the keyword arguments passed to the specialized
-'emc:X-make-cmd' functions;  MAKEFILE is the name of the makefile to
-use (defaults to \"Makefile\"); MAKE-MACROS is a string containing
-'MACRO=DEF' definitions; TARGETS is a string of Makefile targets."
+`emc:X-make-cmd' functions; MAKEFILE is the name of the makefile
+to use (defaults to \"Makefile\"); MAKE-MACROS is a string
+containing \\='MACRO=DEF\\=' definitions; TARGETS is a string of
+Makefile targets."
 
   (message "EMC: making with:")
   (message "EMC: makefile:    %S" makefile)
