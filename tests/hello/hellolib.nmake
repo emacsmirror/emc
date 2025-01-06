@@ -1,0 +1,32 @@
+### -*- Mode: Makefile -*-
+
+### hellolib.nmake
+
+HDRS = hellolib.h
+SRCS = hellolib.c hello.c
+OBJS = $(SRCS:.c=.obj)
+HDLL = hellolib.dll
+HLIB = hellolib.lib
+HEXP = hellolib.exp
+HDEFS = hellolib.def
+
+RM = del
+
+all : hello hellolib
+
+hello : hello.obj $(HDLL) $(HLIB) $(HDRS)
+	$(CC) hello.c $(HLIB)
+
+hellolib : $(HDLL)
+
+$(HDLL) : $(OBJS) $(HDRS)
+	$(CC) /LD $(OBJS) $(HDEFS) /DLL:$(HDLL)
+
+$(OBJS) : $(SRCS) $(HDRS)
+	$(CC) /TC /c $*.c
+
+clean :
+	$(RM) $(OBJS) $(HDLL) $(HLIB) $(HEXP) hello.exe
+
+
+### hellolib.nmake ends here.

@@ -1,0 +1,14 @@
+; -*- Mode: DEF -*-
+
+; hellolib.def
+;
+; A tiny library for testing.
+;
+; Exports definition file for MSVC Windows setup.
+
+LIBRARY "hellolib"
+
+EXPORTS
+   hellolib_say_hello
+
+; hellolib.def ends here.
