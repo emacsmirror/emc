@@ -1,11 +1,12 @@
 *~
-*elc
+*.elc
 *.o
 *.dylib
+*.obj
 *.dll
+*.exp
 *.so
 tmp/*
 
-platel_test
-platel_build/*
+
 
