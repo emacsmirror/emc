@@ -346,6 +346,6 @@ assumptions (not yet working)."
 
 ;;; Epilogue.
 
-(provide 'emc)
+(provide 'emc '(make))
 
 ;;; emc.el ends here
