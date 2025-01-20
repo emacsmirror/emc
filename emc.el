@@ -12,6 +12,7 @@
 ;; Summary: Invoking a C/C++ build toolchain from Emacs.
 ;;
 ;; Created: 2025-01-02
+;; Version: 2025-01-20
 ;;
 ;; Keywords: languages, operating systems, binary platform.
 
@@ -39,13 +40,14 @@
 ;; +--------------------+--------------------+--------------------+
 ;;
 ;; On Windows 'emc' assumes the installation of Microsoft Visual
-;; Studio (Community -- provisions ar emade to handle the Enterprise
+;; Studio (Community -- provisions are made to handle the Enterprise
 ;; or other versions but they are untested).
 
 
 ;;; Code:
 
 (require 'cl-lib)
+(require 'compile)
 
 
 (defvar emc:path (file-name-directory (or load-file-name "."))
@@ -69,6 +71,7 @@ It depends on command `emacs-version'."
 
 
 ;; MSVC definitions.
+;; -----------------
 
 (defvar emc::*msvc-top-folder*
   "C:\\Program Files\\Microsoft Visual Studio\\2022\\"
@@ -149,6 +152,7 @@ string of makefile targets."
 
 
 ;; UNIX/Linux definitions.
+;; -----------------------
 
 (cl-defun emc:unix-make-cmd (&key
                              (makefile "Makefile" makefile-p)
@@ -169,6 +173,7 @@ definitions; TARGETS is a string of Makefile targets."
 
 
 ;; Mac OS definitions.
+;; -------------------
 
 (cl-defun emc:macos-make-cmd (&rest keys &key &allow-other-keys)
   "Return the \\='make\\=' command (a string) to execute.
@@ -181,38 +186,102 @@ targets.
 This function is essentially an alias for `emc:unix-make-cmd'.
 The variable KEYS collects the arguments to pass to the latter
 function."
-  (apply #'emc:macos-make-cmd keys)
+  (apply #'emc:unix-make-cmd keys)
   )
 
 
 ;; Generic API exported functions.
+;; -------------------------------
+;;
+;; I reuse the 'compile.el' machinery.
 
-(cl-defun emc::invoke-make (make-cmd)
-  "Call the MAKE-CMD in an inferior shell process."
+(defvar emc:*max-line-length* 80
+  "The maximum compilatio line length used by `compile'.
 
-  (with-temp-buffer
-    (let ((cwd ".")
-          (exit-code
-           (call-process-shell-command make-cmd nil t))
-          )
-      (ignore cwd)
-      (if (zerop exit-code)
-          (message "EMC: making succesfull.")
-        ;; The rest is somewhat lifted from 'emacs-libq'.
-        (let ((result-msg (buffer-string)))
-          (if noninteractive
-              (message "EMC: making failed:\n%s\n" result-msg)
-            (with-current-buffer
-                (get-buffer-create "*emc-make*")
-              (let ((inhibit-read-only t))
-                (erase-buffer)
-                (insert result-msg))
-              (compilation-mode)
-              (pop-to-buffer (current-buffer))
-              (error "EMC: making failed"))
-            ))
-        ))
-    ))
+See Also:
+
+`compilation-max-output-line-length'")
+
+
+(defvar emc::*compilation-process* nil
+  "The \\='emc\\=' last compilation process.
+
+The processe is  initiated by \\=`compile\\=' and recorded my \\='emc\\='.")
+
+
+(cl-defun emc::compile-finish-fn (cur-buffer msg)
+  "Function to be added as a hook tp `compilation-finish-functions'.
+
+The arguments are the current buffer CUR-BUFFER and MSG, the messsage
+that is built by the \\='compile\\=' machinery.
+
+Notes:
+
+For the time being, the function is a simple wrapper to add the
+\"EMC\" prefix to the message."
+  (message (format "EMC: %S %S" (buffer-name cur-buffer) msg)))
+
+
+(defun emc::compilation-buffer-name (name-of-mode)
+  "The function used as value for `compilation-buffer-name-function'.
+
+The variable NAME-OF-MODE is used to build the buffer name."
+
+  ;; This is a hack.  It is just a tiny variation of
+  ;; `compilation--default-buffer-name', since the logic in
+  ;; \\='compile.el\\=' dealing with the compilation buffer names is
+  ;; ... not linear.
+  
+  (cond ((or (eq major-mode (intern-soft name-of-mode))
+             (eq major-mode (intern-soft (concat name-of-mode "-mode"))))
+	 (buffer-name))
+	(t
+	 (concat "*EMC " (downcase name-of-mode) "*"))))
+   
+
+(cl-defun emc::invoke-make (make-cmd &optional (max-ll emc:*max-line-length*))
+  "Call the MAKE-CMD using `compile'.
+
+The optional MAX-LL argument is used to set the compilation buffer
+maximum line length."
+  (let ((compilation-max-output-line-length max-ll)
+	(compilation-buffer-name-function #'emc::compilation-buffer-name)
+	)
+    (prog1 (compile make-cmd)
+
+      ;; Let's hope no intervening `compile' was issued in the
+      ;; meanwhile.
+
+      (setf emc::*compilation-process* (cl-first compilation-in-progress))
+      )))
+
+
+;; (cl-defun emc::invoke-make (make-cmd)
+;;   "Call the MAKE-CMD in an inferior shell process."
+
+;;   (with-temp-buffer
+;;     (let ((cwd ".")
+;;           (exit-code
+;;            (call-process-shell-command make-cmd nil t))
+;;           )
+;;       (ignore cwd)
+;;       (if (zerop exit-code)
+;;           (message "EMC: making succesfull.")
+;;         ;; The rest is somewhat lifted from 'emacs-libq'.
+;;         (let ((result-msg (buffer-string)))
+;;           (if noninteractive
+;;               (message "EMC: making failed:\n%s\n" result-msg)
+;;             (with-current-buffer
+;;                 (get-buffer-create "*emc-make*")
+;;               (let ((inhibit-read-only t))
+;;                 (erase-buffer)
+;;                 (insert result-msg))
+;;               (compilation-mode)
+;;               (pop-to-buffer (current-buffer))
+;;               (error "EMC: making failed"))
+;;             ))
+;;         ))
+;;     ))
 
 
 (cl-defun emc:make (&rest keys
@@ -220,6 +289,8 @@ function."
                           (makefile "Makefile")
                           (make-macros "")
                           (targets "")
+			  (wait nil)
+			  (build-system :make)
                           &allow-other-keys)
   "Call a \\='make\\=' program in a platform dependend way.
 
@@ -227,22 +298,49 @@ KEYS contains the keyword arguments passed to the specialized
 `emc:X-make-cmd' functions; MAKEFILE is the name of the makefile
 to use (defaults to \"Makefile\"); MAKE-MACROS is a string
 containing \\='MACRO=DEF\\=' definitions; TARGETS is a string of
-Makefile targets."
+Makefile targets.  WAIT is a boolean telling `emc:make' whether to
+wait or not for the compilation process termination.  BUILD-SYSTEM
+specifies what type of tool is used to build result; the default is
+\\=':make\\=' which works of the different known platforms using
+\\='make\\=' or \\='nmake\\='; another experimental value is
+\\=':cmake\\=' which invokes a \\='CMake\\' build pipeline with some
+assumptions (not yet working)."
+
+  ;; This function needs rewriting.
 
   (message "EMC: making with:")
   (message "EMC: makefile:    %S" makefile)
   (message "EMC: make-macros: %S" make-macros)
   (message "EMC: targets:     %S" targets)
   (message "EMC: making...")
-  
+
   (cl-case system-type
     (windows-nt
-     (emc::invoke-make (apply #'emc:msvc-make-cmd keys)))
+     (cl-case build-system
+       (:make (emc::invoke-make (apply #'emc:msvc-make-cmd keys)))
+       (t (error "EMC: build system %s cannot be used (yet)"
+		 build-system))
+       ))
     (darwin
-     (emc::invoke-make (apply #'emc:macos-make-cmd keys)))
+     (cl-case build-system
+       (:make (emc::invoke-make (apply #'emc:macos-make-cmd keys)))
+       (t (error "EMC: build system %s cannot be used (yet)"
+		 build-system))
+       ))
     (otherwise                          ; Generic UNIX/Linux.
-     (emc::invoke-make (apply #'emc:unix-make-cmd keys)))
+     (cl-case build-system
+       (:make (emc::invoke-make (apply #'emc:unix-make-cmd keys)))
+       (t (error "EMC: build system %s cannot be used (yet)"
+		 build-system))
+       ))
     )
+
+  (when wait
+    (message "EMC: waiting...")
+    (while (memq emc::*compilation-process*  compilation-in-progress)
+      ;; Spin loop.
+      (sit-for 1.0))
+    (message "EMC: done."))
   )
 
 
