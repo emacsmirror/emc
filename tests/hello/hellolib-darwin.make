@@ -9,11 +9,14 @@ HLIB = $(SRCS:.c=.dylib)
 
 all : hello
 
+
 hello : hello.o $(HLIB)
 	$(CC) -o hello $< $(HLIB)
 
+
 $(HLIB) : $(OBJS) $(HDRS)
 	$(CC) -shared -o $(HLIB) $(OBJS)
+
 
 $(OBJS) : $(SRCS) $(HDRS)
 	$(CC) -c -FPIC $<
