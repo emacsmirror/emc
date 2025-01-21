@@ -122,6 +122,7 @@ The web link is from 2025-01-03.  It may need some tweaking."
     (&key
      ((:installation msvc-installation) "Community")
      ((:vcvars-bat msvc-vcvarsall-bat) "vcvars64.bat")
+     (build-dir default-directory bd-p)
      (makefile "Makefile" makefile-p)
      (make-macros "" make-macros-p)
      (nologo t)
@@ -136,9 +137,12 @@ setup done by `emc:msc-vcvarsall-cmd'.  The variables
 `emc:msc-vcvarsall-cmd'; MAKE-MACROS is a string containing
 MACRO=DEF definitions; NOLOGO specifies whether or not to pass
 the \\='/NOLOGO\\=' flag to \\='nmake\\='; finally TARGETS is a
-string of makefile targets."
+string of makefile targets.  Finally, BUILD-DIR contains the folder
+where \\='nmake\\=' will be run."
 
-  (concat "("
+  (concat (if bd-p (concat "cd " build-dir " & ") "") ; Cf., `compile'.
+
+	  "("
           (shell-quote-argument
            (emc:msvc-vcvarsall-cmd msvc-installation msvc-vcvarsall-bat))
           " > nul )"  ; To suppress the logo from 'msvc-vcvarsall-bat'.
@@ -155,6 +159,7 @@ string of makefile targets."
 ;; -----------------------
 
 (cl-defun emc:unix-make-cmd (&key
+			     (build-dir default-directory bd-p)
                              (makefile "Makefile" makefile-p)
                              (make-macros "" make-macros-p)
                              (targets "")
@@ -163,9 +168,11 @@ string of makefile targets."
 
 MAKEFILE is the \\='Makefile\\=' to pass to \\='make\\=' via the
 \\='-f\\=' flag; MAKE-MACROS is a string containing 'MACRO=DEF'
-definitions; TARGETS is a string of Makefile targets."
+definitions; TARGETS is a string of Makefile targets.  BUILD-DIR is
+the folder where \\='make\\=' will be invoked."
 
-  (concat "make "
+  (concat (if bd-p (concat "cd " build-dir " ; ") "")
+	  "make "
           (when makefile-p (format "-f %s " (shell-quote-argument makefile)))
           (when make-macros-p (concat (shell-quote-argument make-macros) " "))
           targets)
@@ -291,6 +298,7 @@ maximum line length."
                           (targets "")
 			  (wait nil)
 			  (build-system :make)
+			  (build-dir default-directory)
                           &allow-other-keys)
   "Call a \\='make\\=' program in a platform dependend way.
 
@@ -304,9 +312,21 @@ specifies what type of tool is used to build result; the default is
 \\=':make\\=' which works of the different known platforms using
 \\='make\\=' or \\='nmake\\='; another experimental value is
 \\=':cmake\\=' which invokes a \\='CMake\\' build pipeline with some
-assumptions (not yet working)."
+assumptions (not yet working).  Finally, BUILD-DIR is the
+directory (folder) where the build system will be invoked."
 
-  ;; This function needs rewriting.
+  ;; This function needs rewriting; too many repetitions.
+
+  ;; Some preventive basic error checking.
+  
+  (unless (file-exists-p build-dir)
+    (error "EMC: error: non-existing build directory %S" build-dir))
+
+  (unless (file-exists-p (concat (file-name-as-directory build-dir) makefile))
+    (error "EMC: error: no %S in build directory %S" makefile build-dir))
+
+
+  ;; Here we go.
 
   (message "EMC: making with:")
   (message "EMC: makefile:    %S" makefile)
