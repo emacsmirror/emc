@@ -95,20 +95,23 @@
   "The location EMC is loaded from.")
 
 
-(defun emc::emacs-version ()
-  "Return the Emacs version as \"MM.mm\".
+;; Useless.  The variable `emacs-version' (not the command) is what I
+;; want.
 
-It depends on command `emacs-version'."
-  (let* ((emv (emacs-version))
-	 (em-maj-min-match
-	  (string-match "GNU Emacs \\([0-9]+\\).\\([0-9]+\\)" emv))
-	 )
-    (if em-maj-min-match
-	(concat (match-string 1 emv)
-		"."
-		(match-string 2 emv))
-      (error "EMC: cannot determine Emacs Major.minor version")
-      )))
+;; (defun emc::emacs-version ()
+;;   "Return the Emacs version as \"MM.mm\".
+;;
+;; It depends on command `emacs-version'."
+;;   (let* ((emv (emacs-version))
+;; 	 (em-maj-min-match
+;; 	  (string-match "GNU Emacs \\([0-9]+\\).\\([0-9]+\\)" emv))
+;; 	 )
+;;     (if em-maj-min-match
+;; 	(concat (match-string 1 emv)
+;; 		"."
+;; 		(match-string 2 emv))
+;;       (error "EMC: cannot determine Emacs Major.minor version")
+;;       )))
 
 
 ;; MSVC definitions.
