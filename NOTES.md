@@ -10,3 +10,11 @@ better to switch to the `compile` machinery.
 
 After switching to the `compile` machinery, it may be worthwhile to
 change to a more `defgeneric` based implementation.
+
+
+## 2025-03-18
+
+The build system depends on the platform `system-type` and on the
+`build-system`, which can be `make`, `nmake`, or `cmake`.
+The generic functions will therefore combine these at a minimum.
+
