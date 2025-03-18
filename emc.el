@@ -82,7 +82,7 @@
 ;; ```
 ;;
 ;; as a result `compile' will do the right thing by intercepting the 'cd' in
-;; the string. 
+;; the string.
 
 
 ;;; Code:
@@ -211,7 +211,7 @@ where \\='nmake\\=' will be run."
   "Return the \\='make\\=' command (a string) to execute.
 
 MAKEFILE is the \\='Makefile\\=' to pass to \\='make\\=' via the
-\\='-f\\=' flag; MAKE-MACROS is a string containing 'MACRO=DEF'
+\\='-f\\=' flag; MAKE-MACROS is a string containing \\='MACRO=DEF\\='
 definitions; TARGETS is a string of Makefile targets.  BUILD-DIR is
 the folder where \\='make\\=' will be invoked."
 
