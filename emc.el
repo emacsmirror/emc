@@ -12,7 +12,7 @@
 ;; Summary: Invoking a C/C++ build toolchain from Emacs.
 ;;
 ;; Created: 2025-01-02
-;; Version: 2025-01-21
+;; Version: 2025-03-18
 ;;
 ;; Keywords: languages, operating systems, binary platform.
 
@@ -91,44 +91,47 @@
 (require 'compile)
 
 
+(defgroup emc ()
+  "The Emacs Make Compile (EMC) thin layer over the invocation of
+  C/C++ and compiler toolchains."
+  :group 'tools
+  )
+
+
 (defvar emc:path (file-name-directory (or load-file-name "."))
   "The location EMC is loaded from.")
-
-
-;; Useless.  The variable `emacs-version' (not the command) is what I
-;; want.
-
-;; (defun emc::emacs-version ()
-;;   "Return the Emacs version as \"MM.mm\".
-;;
-;; It depends on command `emacs-version'."
-;;   (let* ((emv (emacs-version))
-;; 	 (em-maj-min-match
-;; 	  (string-match "GNU Emacs \\([0-9]+\\).\\([0-9]+\\)" emv))
-;; 	 )
-;;     (if em-maj-min-match
-;; 	(concat (match-string 1 emv)
-;; 		"."
-;; 		(match-string 2 emv))
-;;       (error "EMC: cannot determine Emacs Major.minor version")
-;;       )))
 
 
 ;; MSVC definitions.
 ;; -----------------
 
-(defvar emc::*msvc-top-folder*
-  "C:\\Program Files\\Microsoft Visual Studio\\2022\\"
-  "The Microsoft Visual Studio 2022 Community standard location."
+(defgroup emc-msvc ()
+  "Customizations for EMC MS Visual Studio setup."
+  :group 'emc
   )
 
 
-(defvar emc:*msvc-installation* "Community"
-  "The type of the MSVC installation.")
+(defcustom emc:*msvc-top-folder*
+  "C:\\Program Files\\Microsoft Visual Studio\\2022\\"
+  "The Microsoft Visual Studio 2022 Community standard location."
+  :group 'emc-msvc
+  :type 'directory
+  )
 
 
-(defvar emc:*msvc-vcvars-bat* "vcvars64.bat"
-  "The name of the MSVC batch file used to set up the MSVC environment.")
+(defcustom emc:*msvc-installation* "Community"
+  "The type of the MSVC installation."
+  :group 'emc-msvc
+  :type 'string
+  )
+
+
+
+(defcustom emc:*msvc-vcvars-bat* "vcvars64.bat"
+  "The name of the MSVC batch file used to set up the MSVC environment."
+  :group 'emc-msvc
+  :type 'string
+  )
   
 
 (cl-defun emc:msvc-folder (&optional (msvc-installation "Community"))
@@ -140,7 +143,7 @@ be changed to, e.g., \"Enterprise\".
 The result is a string representing the pathname of the main MSVC
 folder, that is `emc::*msvc-top-folder*' contatenated with
 MSVC-INSTALLATION."
-  (concat emc::*msvc-top-folder* msvc-installation "\\"))
+  (concat emc:*msvc-top-folder* msvc-installation "\\"))
 
 
 (cl-defun emc:msvc-vcvarsall-cmd (&optional
@@ -246,12 +249,15 @@ function."
 ;;
 ;; I reuse the 'compile.el' machinery.
 
-(defvar emc:*max-line-length* 80
-  "The maximum compilatio line length used by `compile'.
+(defcustom emc:*max-line-length* 80
+  "The maximum compilation line length used by `compile'.
 
 See Also:
 
-`compilation-max-output-line-length'")
+`compilation-max-output-line-length'"
+  :group 'emc
+  :type 'natnum
+  )
 
 
 (defvar emc::*compilation-process* nil
@@ -305,34 +311,6 @@ maximum line length."
 
       (setf emc::*compilation-process* (cl-first compilation-in-progress))
       )))
-
-
-;; (cl-defun emc::invoke-make (make-cmd)
-;;   "Call the MAKE-CMD in an inferior shell process."
-
-;;   (with-temp-buffer
-;;     (let ((cwd ".")
-;;           (exit-code
-;;            (call-process-shell-command make-cmd nil t))
-;;           )
-;;       (ignore cwd)
-;;       (if (zerop exit-code)
-;;           (message "EMC: making succesfull.")
-;;         ;; The rest is somewhat lifted from 'emacs-libq'.
-;;         (let ((result-msg (buffer-string)))
-;;           (if noninteractive
-;;               (message "EMC: making failed:\n%s\n" result-msg)
-;;             (with-current-buffer
-;;                 (get-buffer-create "*emc-make*")
-;;               (let ((inhibit-read-only t))
-;;                 (erase-buffer)
-;;                 (insert result-msg))
-;;               (compilation-mode)
-;;               (pop-to-buffer (current-buffer))
-;;               (error "EMC: making failed"))
-;;             ))
-;;         ))
-;;     ))
 
 
 (cl-defun emc:make (&rest keys
