@@ -260,6 +260,44 @@ See Also:
   )
 
 
+(defun emc::platform-type ()
+  "Return the current \\='platform-type\\='.
+
+The possible values are \\='darwin\\=' (for Mac OS),
+\\='windows-nt\\=', \\='unix\\=', or NIL for an unusable (for the time
+being) platoform type.
+
+See Also:
+
+`system-type'."
+  (cl-case system-type
+    (darwin
+     'darwin)
+    (windows-nt
+     'windows-nt)
+    ((gnu
+      gnu/linux
+      gnu/kfreebsd
+      cygwin
+
+      ;; Old, Emacs 26 specs: see `system-type'.
+      aix
+      berkeley-unix
+      hpux
+      usg-unix-v)
+     'generic-unix)
+    (otherwise
+     nil)))
+
+
+(cl-defgeneric emc:build (sys build-system &rest keys
+			      &key
+			      &allow-other-keys)
+  (:documentation
+   "Invoke the BUILD-SYSTEM on platform SYS; KEYS contains extra parameters.")
+  )
+
+
 (defvar emc::*compilation-process* nil
   "The \\='emc\\=' last compilation process.
 
@@ -325,17 +363,17 @@ maximum line length."
   "Call a \\='make\\=' program in a platform dependend way.
 
 KEYS contains the keyword arguments passed to the specialized
-`emc:X-make-cmd' functions; MAKEFILE is the name of the makefile
-to use (defaults to \"Makefile\"); MAKE-MACROS is a string
+`emc:X-make-cmd' functions via `emc:build'; MAKEFILE is the name of the
+makefile to use (defaults to \"Makefile\"); MAKE-MACROS is a string
 containing \\='MACRO=DEF\\=' definitions; TARGETS is a string of
-Makefile targets.  WAIT is a boolean telling `emc:make' whether to
-wait or not for the compilation process termination.  BUILD-SYSTEM
-specifies what type of tool is used to build result; the default is
-\\=':make\\=' which works of the different known platforms using
-\\='make\\=' or \\='nmake\\='; another experimental value is
-\\=':cmake\\=' which invokes a \\='CMake\\' build pipeline with some
-assumptions (not yet working).  Finally, BUILD-DIR is the
-directory (folder) where the build system will be invoked."
+Makefile targets.  WAIT is a boolean telling `emc:make' whether to wait
+or not for the compilation process termination.  BUILD-SYSTEM specifies
+what type of tool is used to build result; the default is \\=':make\\='
+which works of the different known platforms using \\='make\\=' or
+\\='nmake\\='; another experimental value is \\=':cmake\\=' which
+invokes a \\='CMake\\' build pipeline with some assumptions (not yet
+working).  Finally, BUILD-DIR is the directory (folder) where the build
+system will be invoked."
 
   ;; This function needs rewriting; too many repetitions.
 
@@ -356,36 +394,95 @@ directory (folder) where the build system will be invoked."
   (message "EMC: targets:     %S" targets)
   (message "EMC: making...")
 
-  (cl-case system-type
-    (windows-nt
-     (cl-case build-system
-       (:make (emc::invoke-make (apply #'emc:msvc-make-cmd keys)))
-       (t (error "EMC: build system %s cannot be used (yet)"
-		 build-system))
-       ))
-    (darwin
-     (cl-case build-system
-       (:make (emc::invoke-make (apply #'emc:macos-make-cmd keys)))
-       (t (error "EMC: build system %s cannot be used (yet)"
-		 build-system))
-       ))
-    (otherwise                          ; Generic UNIX/Linux.
-     (cl-case build-system
-       (:make (emc::invoke-make (apply #'emc:unix-make-cmd keys)))
-       (t (error "EMC: build system %s cannot be used (yet)"
-		 build-system))
-       ))
-    )
+  ;; (cl-case system-type
+  ;;   (windows-nt
+  ;;    (cl-case build-system
+  ;;      (:make (emc::invoke-make (apply #'emc:msvc-make-cmd keys)))
+  ;;      (t (error "EMC: build system %s cannot be used (yet)"
+  ;; 		 build-system))
+  ;;      ))
+  ;;   (darwin
+  ;;    (cl-case build-system
+  ;;      (:make (emc::invoke-make (apply #'emc:macos-make-cmd keys)))
+  ;;      (t (error "EMC: build system %s cannot be used (yet)"
+  ;; 		 build-system))
+  ;;      ))
+  ;;   (otherwise                          ; Generic UNIX/Linux.
+  ;;    (cl-case build-system
+  ;;      (:make (emc::invoke-make (apply #'emc:unix-make-cmd keys)))
+  ;;      (t (error "EMC: build system %s cannot be used (yet)"
+  ;; 		 build-system))
+  ;;      ))
+  ;;   )
+
+  (apply #'emc:build (emc::platform-type) build-system keys)
 
   (when wait
     (message "EMC: waiting...")
-    (while (memq emc::*compilation-process*  compilation-in-progress)
+    (while (memq emc::*compilation-process* compilation-in-progress)
       ;; Spin loop.
       (sit-for 1.0))
     (message "EMC: done."))
   )
 
 
+(cl-defmethod emc:build ((sys t) (build-system t)
+			 &rest keys
+			 &key
+			 &allow-other-keys)
+  "Raise an error.
+
+This is a catch-all method that gets Invoked when a generic/unknown
+SYS and BUILD-SYSTEM pair is passed to the generic function.   KEYS is
+ignored."
+  (ignore keys)
+  (error "EMC: build system %s cannot be used (yet) on %s"
+	 build-system
+	 sys)
+  )
+
+
+(cl-defmethod emc:build ((sys (eql 'windows-nt))
+			 (build-system (eql :make))
+			 &rest keys
+			 &key
+			 &allow-other-keys)
+  "Dispatch to the specialized machinery.
+
+The proper calls for the pair SYS equal to \\='windows-nt\\=' and
+BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
+  (ignore sys build-system)
+  (emc::invoke-make (apply #'emc:msvc-make-cmd keys))
+  )
+
+
+(cl-defmethod emc:build ((sys (eql 'darwin))
+			 (build-system (eql :make))
+			 &rest keys
+			 &key
+			 &allow-other-keys)
+    "Dispatch to the specialized machinery.
+
+The proper calls for the pair SYS equal to \\='darwin\\=' and
+BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
+  (ignore sys build-system)
+  (emc::invoke-make (apply #'emc:macos-make-cmd keys))
+  )
+
+
+(cl-defmethod emc:build ((sys (eql 'generic-unix))
+			 (build-system (eql :make))
+			 &rest keys
+			 &key
+			 &allow-other-keys)
+    "Dispatch to the specialized machinery.
+
+The proper calls for the pair SYS equal to \\='generic-unix\\=' and
+BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
+  (ignore sys build-system)
+  (emc::invoke-make (apply #'emc:unix-make-cmd keys))
+  )
+  
 ;;; Epilogue.
 
 (provide 'emc '(make))
