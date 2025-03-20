@@ -178,8 +178,7 @@ The web link is from 2025-01-03.  It may need some tweaking."
   "Return the \\='nmake\\=' command (a string) to execute.
 
 The \\='nmake\\=' command is prepended by the necessary MSVC
-setup done by `emc:msc-vcvarsall-cmd'.  The variables
-:INSTALLATION (keyword variable MSVC-INSTALLATION) and
+setup done by `emc:msc-vcvarsall-cmd'.  The variables :INSTALLATION (keyword variable MSVC-INSTALLATION) and
 :VCVARS-BAT (keyword variable MSVC-VCVARS-BAT) are passed to
 `emc:msc-vcvarsall-cmd'; MAKE-MACROS is a string containing
 MACRO=DEF definitions; NOLOGO specifies whether or not to pass
@@ -290,11 +289,17 @@ See Also:
      nil)))
 
 
-(cl-defgeneric emc:build (sys build-system &rest keys
-			      &key
-			      &allow-other-keys)
-  (:documentation
-   "Invoke the BUILD-SYSTEM on platform SYS; KEYS contains extra parameters.")
+(cl-defgeneric emc:start-making (sys build-system &rest keys
+				     &key
+				     &allow-other-keys)
+  "Invoke the BUILD-SYSTEM on platform SYS.
+
+The variable KEYS contains extra parameters."
+  
+  ;; 'flycheck-mode' needs to do some work.
+  ;;
+  ;; (:documentation
+  ;;  "Invoke the BUILD-SYSTEM on platform SYS; KEYS contains extra parameters.")
   )
 
 
@@ -363,9 +368,9 @@ maximum line length."
   "Call a \\='make\\=' program in a platform dependend way.
 
 KEYS contains the keyword arguments passed to the specialized
-`emc:X-make-cmd' functions via `emc:build'; MAKEFILE is the name of the
-makefile to use (defaults to \"Makefile\"); MAKE-MACROS is a string
-containing \\='MACRO=DEF\\=' definitions; TARGETS is a string of
+`emc:X-make-cmd' functions via `emc:start-making'; MAKEFILE is the name
+of the makefile to use (defaults to \"Makefile\"); MAKE-MACROS is a
+string containing \\='MACRO=DEF\\=' definitions; TARGETS is a string of
 Makefile targets.  WAIT is a boolean telling `emc:make' whether to wait
 or not for the compilation process termination.  BUILD-SYSTEM specifies
 what type of tool is used to build result; the default is \\=':make\\='
@@ -374,8 +379,6 @@ which works of the different known platforms using \\='make\\=' or
 invokes a \\='CMake\\' build pipeline with some assumptions (not yet
 working).  Finally, BUILD-DIR is the directory (folder) where the build
 system will be invoked."
-
-  ;; This function needs rewriting; too many repetitions.
 
   ;; Some preventive basic error checking.
   
@@ -415,7 +418,7 @@ system will be invoked."
   ;;      ))
   ;;   )
 
-  (apply #'emc:build (emc::platform-type) build-system keys)
+  (apply #'emc:start-making (emc::platform-type) build-system keys)
 
   (when wait
     (message "EMC: waiting...")
@@ -426,10 +429,10 @@ system will be invoked."
   )
 
 
-(cl-defmethod emc:build ((sys t) (build-system t)
-			 &rest keys
-			 &key
-			 &allow-other-keys)
+(cl-defmethod emc:start-making ((sys t) (build-system t)
+				&rest keys
+				&key
+				&allow-other-keys)
   "Raise an error.
 
 This is a catch-all method that gets Invoked when a generic/unknown
@@ -442,11 +445,11 @@ ignored."
   )
 
 
-(cl-defmethod emc:build ((sys (eql 'windows-nt))
-			 (build-system (eql :make))
-			 &rest keys
-			 &key
-			 &allow-other-keys)
+(cl-defmethod emc:start-making ((sys (eql 'windows-nt))
+				(build-system (eql :make))
+				&rest keys
+				&key
+				&allow-other-keys)
   "Dispatch to the specialized machinery.
 
 The proper calls for the pair SYS equal to \\='windows-nt\\=' and
@@ -456,12 +459,12 @@ BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
   )
 
 
-(cl-defmethod emc:build ((sys (eql 'darwin))
-			 (build-system (eql :make))
-			 &rest keys
-			 &key
-			 &allow-other-keys)
-    "Dispatch to the specialized machinery.
+(cl-defmethod emc:start-making ((sys (eql 'darwin))
+				(build-system (eql :make))
+				&rest keys
+				&key
+				&allow-other-keys)
+  "Dispatch to the specialized machinery.
 
 The proper calls for the pair SYS equal to \\='darwin\\=' and
 BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
@@ -470,12 +473,12 @@ BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
   )
 
 
-(cl-defmethod emc:build ((sys (eql 'generic-unix))
-			 (build-system (eql :make))
-			 &rest keys
-			 &key
-			 &allow-other-keys)
-    "Dispatch to the specialized machinery.
+(cl-defmethod emc:start-making ((sys (eql 'generic-unix))
+				(build-system (eql :make))
+				&rest keys
+				&key
+				&allow-other-keys)
+  "Dispatch to the specialized machinery.
 
 The proper calls for the pair SYS equal to \\='generic-unix\\=' and
 BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
