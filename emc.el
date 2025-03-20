@@ -12,7 +12,7 @@
 ;; Summary: Invoking a C/C++ build toolchain from Emacs.
 ;;
 ;; Created: 2025-01-02
-;; Version: 2025-03-18
+;; Version: 2025-03-20
 ;;
 ;; Keywords: languages, operating systems, binary platform.
 
@@ -429,6 +429,9 @@ system will be invoked."
   )
 
 
+
+;; make/nmake `emc:start-making' methods.
+
 (cl-defmethod emc:start-making ((sys t) (build-system t)
 				&rest keys
 				&key
@@ -485,6 +488,11 @@ BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
   (ignore sys build-system)
   (emc::invoke-make (apply #'emc:unix-make-cmd keys))
   )
+
+
+;; CMake `emc:start-making' methods.
+
+
   
 ;;; Epilogue.
 
