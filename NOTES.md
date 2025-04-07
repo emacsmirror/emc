@@ -18,3 +18,9 @@ The build system depends on the platform `system-type` and on the
 `build-system`, which can be `make`, `nmake`, or `cmake`.
 The generic functions will therefore combine these at a minimum.
 
+
+## 2025-04-01
+
+Adding `CMake` commands.  Maybe I will have to byte the bullet and
+make three ways generic functions taking into account the *sub
+command* as well.
