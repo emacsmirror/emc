@@ -12,7 +12,7 @@
 ;; Summary: Invoking a C/C++ build toolchain from Emacs.
 ;;
 ;; Created: 2025-01-02
-;; Version: 2025-04-07
+;; Version: 2025-04-09
 ;;
 ;; Keywords: languages, operating systems, binary platform.
 
@@ -465,7 +465,7 @@ This is just a wrapper for `emc:unix-cmake-cmd'."
 ;;
 ;; I reuse the 'compile.el' machinery.
 
-(defcustom emc:*max-line-length* 80
+(defcustom emc:*max-line-length* 72
   "The maximum compilation line length used by `compile'.
 
 See Also:
@@ -582,10 +582,6 @@ The variable KEYS contains extra parameters."
 
 The processe is  initiated by \\=`compile\\=' and recorded my
 \\='emc\\='.")
-
-
-(defvar emc:*max-line-length* 72
-  "Line length for compilation buffer.")
 
 
 (cl-defun emc::compile-finish-fn (cur-buffer msg)
@@ -1010,8 +1006,82 @@ and BUILD-DIR are as per `emc:make'."
     ))
 
 
+
+;; emc::read-build-parms-minibuffer
+
+(defun emc::read-build-parms-minibuffer ()
+  "Read the common build system parameters from minibuffer."
+  (let* ((read-answer-short nil)	; Force long answers.
+	 (cmd
+	  (car
+	   (read-from-string
+	    (read-answer "Command: "
+			 '((":setup" ?s "setup the project")
+			   (":build" ?b "build the project")
+			   (":install" ?i "install the project")
+			   (":uninstall" ?u "uninstall the project")
+			   (":fresh" ?f "freshen the project")
+			   (":clean" ?c "clean the project")
+			   ))))
+	  )
+	 )
+    (if prefix-arg
+	(let ((build-system
+	       (read-answer "Build with: "
+			    '((":make" ?m "use 'make.")
+			      (":cmake" ?c "use 'cmake'.")
+			      ))
+	       )
+	      (source-dir
+	       (expand-file-name
+		(read-directory-name "Source directory: ")))
+	      (build-dir
+	       (expand-file-name
+		(read-directory-name "Build directory: ")))
+	      (macros
+	       (read-from-minibuffer "Macros: " nil nil nil nil ""))
+	      (targets
+	       (read-from-minibuffer "Targets: " nil nil nil nil ""))
+	      )
+	  (list cmd
+		:build-system (car (read-from-string build-system))
+		:source-dir source-dir
+		:build-dir build-dir
+		:macros macros
+		:targets targets
+		:prefix current-prefix-arg
+		))
+      (list cmd
+	    :build-system :make
+	    :source-dir default-directory
+	    :build-dir default-directory
+	    :macros ""
+	    :targets ""
+	    :prefix current-prefix-arg
+	    ))
+    ))
+
+
+;; emc:run
+;; The most general entry point.
+
+(cl-defun emc:run (cmd &rest keys
+		       &key
+		       (prefix 42)
+		       (build-system :make)
+		       (source-dir default-directory)
+		       (build-dir default-directory)
+		       (macros "")
+		       (targets "")
+		       &allow-other-keys)
+  "Run the \\='making toolchain\\='."
+  (interactive (emc::read-build-parms-minibuffer))
+
+  (message "EMC: %s %S" cmd keys))
+
+
 ;;; Epilogue.
 
-(provide 'emc '(make))
+(provide 'emc '(make cmake))
 
 ;;; emc.el ends here
