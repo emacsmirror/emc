@@ -9,17 +9,17 @@
 ;; Author: Marco Antoniotti <marcoxa [at] gmail.com>
 ;; Maintainer: Marco Antoniotti <marcoxa [at] gmail.com>
 ;;
-;; Summary: Invoking a C/C++ build toolchain from Emacs.
+;; Summary: Invoking a C/C++ (and other) build toolchain from Emacs.
 ;;
 ;; Created: 2025-01-02
-;; Version: 2025-04-09
+;; Version: 2025-04-10
 ;;
 ;; Keywords: languages, operating systems, binary platform.
 
 
 ;;; Commentary:
 ;;
-;; Invoking a C/C++ build tool-chain from Emacs.
+;; Invoking a C/C++ (and other) build tool-chain from Emacs.
 ;;
 ;; The standard 'compile' machinery is mostly designed for interactive
 ;; use, but nowadays, for C/C++ at least, build systems and different
@@ -29,7 +29,7 @@
 ;; (Linux), Mac OS and Windows.  The 'emc' library interfaces to
 ;; 'make' and 'nmake' building setup and to 'cmake' (www.cmake.org).
 ;;
-;; The 'Makefile' combinations supported are
+;; The supported 'Makefile' combinations are:
 ;; +--------------------+--------------------+--------------------+
 ;; |                    |                    |                    |
 ;; | Unix/Linux         | Mac OS             | Windows (10/11)    |
@@ -52,7 +52,7 @@
 ;;
 ;; Invoking the command `emc:run' will use the
 ;; `emc:*default-build-system*' (defaulting to `:make') on the current
-;; platform supplying hopefully reasonable defaults. E.g.,
+;; platform supplying hopefully reasonable defaults.  E.g.,
 ;; ```
 ;;    (emc:run)
 ;; ```
@@ -111,7 +111,7 @@
 ;; 3. `:install': which is equivalent to 'cmake --install <bindir>'.
 ;; 4. `:uninstall': which currently has no `cmake' equivalent.
 ;; 5. `:clean': equivalent to 'cmake --build <bindir> -t clean'.
-;; 5. `:freash': equivalent to 'cmake --fresh <bindir>'.
+;; 5. `:fresh': equivalent to 'cmake --fresh <bindir>'.
 ;;
 
 
@@ -267,6 +267,7 @@ The web link is from 2025-01-03.  It may need some tweaking."
      (make-macros "" make-macros-p)
      (nologo t)
      (targets "")
+     ;; (dry-run nil)
      &allow-other-keys)
   "Return the \\='nmake\\=' command (a string) to execute.
 
@@ -277,7 +278,8 @@ MSVC-VCVARS-BAT) are passed to `emc:msc-vcvarsall-cmd'; MAKE-MACROS is a
 string containing MACRO=DEF definitions; NOLOGO specifies whether or not
 to pass the \\='/NOLOGO\\=' flag to \\='nmake\\='; finally TARGETS is a
 string of makefile targets.  Finally, BUILD-DIR contains the folder
-where \\='nmake\\=' will be run."
+where \\='nmake\\=' will be run. DRY-RUN runs the \\='nmake\\=' command
+without executing it."
 
   (concat (if bd-p (concat "cd " build-dir " & ") "") ; Cf., `compile'.
 
@@ -290,6 +292,7 @@ where \\='nmake\\=' will be run."
           (when nologo "/NOLOGO ")
           (when makefile-p (format "/F %s " (shell-quote-argument makefile)))
           (when make-macros-p (concat (shell-quote-argument make-macros) " "))
+	  ;; (when dry-run "-n ")
           targets)
   )
 
@@ -306,18 +309,19 @@ where \\='nmake\\=' will be run."
      ;; (make-macros "" make-macros-p)
      ;; (nologo t)
      (targets "")
+     (dry-run nil)
      &allow-other-keys)
   "Return the \\='cmake\\=' command (a string) to execute.
 
 The \\='cmake\\=' command is prepended by the necessary MSVC setup done
 by `emc:msc-vcvarsall-cmd'.  The variables :INSTALLATION (keyword
 variable MSVC-INSTALLATION) and :VCVARS-BAT (keyword variable
-MSVC-VCVARS-BAT) are passed to `emc:msc-vcvarsall-cmd'..
-COMMAND is the \\='cmake\\=' selector for the top level switch.
-TARGETS is a string of Makefile targets.  BUILD-DIR is the folder where
-\\='cmake\\=' will build the project.  SOURCE-DIR is the folder where
-the project folder resides.  INSTALL-DIR is used for the
-\\=':install\\=' command."
+MSVC-VCVARS-BAT) are passed to `emc:msc-vcvarsall-cmd'..  COMMAND is the
+\\='cmake\\=' selector for the top level switch.  TARGETS is a string of
+Makefile targets.  BUILD-DIR is the folder where \\='cmake\\=' will
+build the project.  SOURCE-DIR is the folder where the project folder
+resides.  INSTALL-DIR is used for the \\=':install\\=' command. DRY-RUN
+runs the \\='cmake\\=' command without executing it."
 
   (let* ((sd (if sd-p (shell-quote-argument source-dir) source-dir))
 	 (bd (if bd-p (shell-quote-argument build-dir) build-dir))
@@ -332,6 +336,7 @@ the project folder resides.  INSTALL-DIR is used for the
             " > nul )" ; To suppress the logo from 'msvc-vcvarsall-bat'.
             " & "
 	    (emc::cmake-cmd cmd-kwd sd bd id)
+	    (when dry-run " -N ")
 	    (mapconcat #'(lambda (s) (concat " -t " s))
 		       targets-list)
 	    )
@@ -346,18 +351,21 @@ the project folder resides.  INSTALL-DIR is used for the
                              (makefile "Makefile" makefile-p)
                              (make-macros "" make-macros-p)
                              (targets "")
+			     (dry-run nil)
                              &allow-other-keys)
   "Return the \\='make\\=' command (a string) to execute.
 
 MAKEFILE is the \\='Makefile\\=' to pass to \\='make\\=' via the
 \\='-f\\=' flag; MAKE-MACROS is a string containing \\='MACRO=DEF\\='
-definitions; TARGETS is a string of Makefile targets.  BUILD-DIR is
-the folder where \\='make\\=' will be invoked."
+definitions; TARGETS is a string of Makefile targets.  BUILD-DIR is the
+folder where \\='make\\=' will be invoked.  DRY-RUN runs the
+\\='cmake\\=' command without executing it."
 
   (concat (if bd-p (concat "cd " build-dir " ; ") "")
 	  "make "
           (when makefile-p (format "-f %s " (shell-quote-argument makefile)))
           (when make-macros-p (concat (shell-quote-argument make-macros) " "))
+	  (when dry-run "-n ")
           targets)
   )
 
@@ -368,14 +376,16 @@ the folder where \\='make\\=' will be invoked."
 			      (build-dir default-directory bd-p)
 			      (install-dir default-directory id-p)
                               (targets "")
+			      (dry-run nil)
                               &allow-other-keys)
   "Return the \\='cmake\\=' command (a string) to execute.
 
-COMMAND is the \\='cmake\\=' selector for the top level switch.
-TARGETS is a string of Makefile targets.  BUILD-DIR is the folder where
+COMMAND is the \\='cmake\\=' selector for the top level switch.  TARGETS
+is a string of Makefile targets.  BUILD-DIR is the folder where
 \\='cmake\\=' will build the project.  SOURCE-DIR is the folder where
 the project folder resides.  INSTALL-DIR is used for the
-\\=':install\\=' command.
+\\=':install\\=' command DRY-RUN runs the \\='cmake\\=' command without
+executing it..
 
 Examples:
 
@@ -409,6 +419,7 @@ yields
 	      )
 	
       (concat (cmake-cmd cmd-kwd)
+	      (when dry-run " -N ")
 	      (mapconcat #'(lambda (s) (concat " -t " s))
 			 targets-list)
 	      )
@@ -473,6 +484,13 @@ See Also:
 `compilation-max-output-line-length'"
   :group 'emc
   :type 'natnum
+  )
+
+
+(defcustom emc:*verbose* nil
+  "If non NIL show messages about EMC progress."
+  :group 'emc
+  :type 'sexp
   )
 
 
@@ -594,7 +612,7 @@ Notes:
 
 For the time being, the function is a simple wrapper to add the
 \"EMC\" prefix to the message."
-  (message (format "EMC: %S %S" (buffer-name cur-buffer) msg)))
+  (message "EMC: %S %S" (buffer-name cur-buffer) msg))
 
 
 (defun emc::compilation-buffer-name (name-of-mode)
@@ -614,14 +632,22 @@ The variable NAME-OF-MODE is used to build the buffer name."
 	 (concat "*EMC " (downcase name-of-mode) "*"))))
    
 
-(cl-defun emc::invoke-make (make-cmd &optional (max-ll emc:*max-line-length*))
+(cl-defun emc::invoke-make (make-cmd &optional
+				     (max-ll emc:*max-line-length*)
+				     (verbose emc:*verbose*)
+				     )
   "Call the MAKE-CMD using `compile'.
 
 The optional MAX-LL argument is used to set the compilation buffer
-maximum line length."
+maximum line length.  VERBOSE controls whether the function prints out
+progress messages."
   (let ((compilation-max-output-line-length max-ll)
 	(compilation-buffer-name-function #'emc::compilation-buffer-name)
 	)
+
+    (when verbose
+      (message "EMC: invoking %S" make-cmd))
+    
     (prog1 (compile make-cmd)
 
       ;; Let's hope no intervening `compile' was issued in the
@@ -636,6 +662,7 @@ maximum line length."
                           (makefile "Makefile")
                           (make-macros "")
                           (targets "")
+			  (dry-run nil)
 			  (wait nil)
 			  (build-system :make)
 			  (build-dir default-directory)
@@ -651,10 +678,13 @@ or not for the compilation process termination.  BUILD-SYSTEM specifies
 what type of tool is used to build result; the default is \\=':make\\='
 which works of the different known platforms using \\='make\\=' or
 \\='nmake\\='; another experimental value is \\=':cmake\\=' which
-invokes a \\='CMake\\' build pipeline with some assumptions (not yet
-working).  Finally, BUILD-DIR is the directory (folder) where the build
-system will be invoked."
+invokes a \\='CMake\\=' build pipeline with some assumptions (not yet
+working).  BUILD-DIR is the directory (folder) where the build
+system will be invoked. DRY-RUN runs the \\='cmake\\=' command without
+executing it."
 
+  (ignore dry-run)
+  
   ;; Some preventive basic error checking.
   
   (unless (file-exists-p build-dir)
@@ -671,27 +701,6 @@ system will be invoked."
   (message "EMC: make-macros: %S" make-macros)
   (message "EMC: targets:     %S" targets)
   (message "EMC: making...")
-
-  ;; (cl-case system-type
-  ;;   (windows-nt
-  ;;    (cl-case build-system
-  ;;      (:make (emc::invoke-make (apply #'emc:msvc-make-cmd keys)))
-  ;;      (t (error "EMC: build system %s cannot be used (yet)"
-  ;; 		 build-system))
-  ;;      ))
-  ;;   (darwin
-  ;;    (cl-case build-system
-  ;;      (:make (emc::invoke-make (apply #'emc:macos-make-cmd keys)))
-  ;;      (t (error "EMC: build system %s cannot be used (yet)"
-  ;; 		 build-system))
-  ;;      ))
-  ;;   (otherwise                          ; Generic UNIX/Linux.
-  ;;    (cl-case build-system
-  ;;      (:make (emc::invoke-make (apply #'emc:unix-make-cmd keys)))
-  ;;      (t (error "EMC: build system %s cannot be used (yet)"
-  ;; 		 build-system))
-  ;;      ))
-  ;;   )
 
   (apply #'emc:start-making (emc::platform-type) build-system keys)
 
@@ -767,7 +776,59 @@ BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
 
 ;; CMake and CMake `emc:start-making' methods.
 
-(cl-defgeneric emc:cmake (cmd &rest keys &key &allow-other-keys)
+(cl-defun emc:cmake (cmd &rest keys
+                         &key
+                         (make-macros "")
+                         (targets "")
+			 (dry-run nil)
+			 (wait nil)
+			 (source-dir default-directory)
+			 (build-dir default-directory)
+                         &allow-other-keys)
+  "Call \\='cmake\\=' in a platform dependend way.
+
+CMD is the \\='cmake\\=' subcommand to invoke (e.g., \\=':build\\=' or
+\\=':install\\=').  KEYS contains the keyword arguments passed to the
+specialized `emc:X-cmake-cmd' functions via `emc:start-making';
+MAKE-MACROS is a string containing \\='MACRO=DEF\\=' definitions;
+TARGETS is a string of Makefile targets.  WAIT is a boolean telling
+`emc:cmake' whether to wait or not for the compilation process
+termination.  Finally, SOURCE-DIR is the directory (folder) where the
+project resides, while BUILD-DIR is the directory (folder) where the
+build system will be invoked.  DRY-RUN runs the \\='cmake\\=' command
+without executing it."
+
+  (ignore dry-run)
+  
+  ;; Some preventive basic error checking.
+  
+  (unless (file-exists-p source-dir)
+    (error "EMC: error: non-existing source directory %S" source-dir))
+  (unless (file-exists-p build-dir)
+    (error "EMC: error: non-existing build directory %S" build-dir))
+
+  ;; Here we go.
+
+  (message "EMC: running 'cmake' command %S" cmd)
+  (message "EMC: source-dir:  %S" source-dir)
+  (message "EMC: build-dir:   %S" build-dir)
+  (message "EMC: make-macros: %S" make-macros)
+  (message "EMC: targets:     %S" targets)
+  (message "EMC: making...")
+
+  (apply #'emc:start-making (emc::platform-type) :cmake :command cmd keys)
+
+  (when wait
+    (message "EMC: waiting...")
+    (while (memq emc::*compilation-process* compilation-in-progress)
+      ;; Spin loop.
+      (sit-for 1.0))
+    (message "EMC: done."))
+  )
+
+
+
+(cl-defgeneric emc:cmake-gf (cmd &rest keys &key &allow-other-keys)
   "Interface for \\='cmake\\='.
 
 The CMD parameter works almost like the \\='cmake\\=' command line
@@ -775,30 +836,30 @@ couterpart.  KEYS groups the extra parameters passed to the
 function.")
 
 
-(cl-defmethod emc:cmake ((cmd (eql :build)) &key &allow-other-keys)
+(cl-defmethod emc:cmake-gf ((cmd (eql :build)) &key &allow-other-keys)
   "Method to invoke \\='cmake\\=' \"build\" command, when CMD is \\=':build\\='."
   (ignore cmd)
   )
 
 
-(cl-defmethod emc:cmake ((cmd (eql :install)) &key &allow-other-keys)
+(cl-defmethod emc:cmake-gf ((cmd (eql :install)) &key &allow-other-keys)
   "Method to invoke \\='cmake\\=' \"build\" command, when CMD is \\=':install\\='."
   (ignore cmd)
   )
 
 
-(cl-defmethod emc:cmake ((cmd (eql :uninstall)) &key &allow-other-keys)
+(cl-defmethod emc:cmake-gf ((cmd (eql :uninstall)) &key &allow-other-keys)
   "Method to invoke \\='cmake\\=' \"build\" command, when CMD is \\=':uninstall\\='."
   (ignore cmd)
   )
 
 
-(cl-defmethod emc:cmake ((cmd (eql :build)) &key &allow-other-keys)
+(cl-defmethod emc:cmake-gf ((cmd (eql :build)) &key &allow-other-keys)
   "Method to invocke \\='cmake\\=' \"build\" command, when CMD is \\=':build\\='."
   (ignore cmd)
   )
 
-(cl-defmethod emc:cmake ((cmd (eql :fresh)) &key &allow-other-keys)
+(cl-defmethod emc:cmake-gf ((cmd (eql :fresh)) &key &allow-other-keys)
   "Method to invoke \\='cmake\\=' \"build\" command, when CMD is \\=':fresh\\='."
   (ignore cmd)
   )
@@ -849,6 +910,34 @@ BUILD-SYSTEM equal to \\=':cmake\\=' is invoked with KEYS."
 
 
 ;; Commands
+
+(cl-defun emc:setup (&rest keys
+                           &key
+                           (makefile "Makefile")
+                           (make-macros "")
+                           (targets "")
+			   (wait nil)
+			   (build-system :make)
+			   (build-dir default-directory)
+                           &allow-other-keys)
+  "EMC Build command.
+
+For a \\'make\\=' based build it is essentially a no-op.  For a
+\\'CMake\\' based build system it re-packages the targets and calls the
+relevant function.
+
+The variables KEYS, MAKEFILE, MAKE-MACROS, WAIT, TARGETS, BUILD-SYSTEM
+and BUILD-DIR are as per `emc:make'."
+
+  (ignore makefile make-macros targets wait build-dir)
+
+  (cl-case build-system
+    (:make t)
+    (:cmake (apply #'emc:cmake :setup keys))
+    (t
+     (error "EMC: error: unknown build system %s" build-system))
+    ))
+
 
 (cl-defun emc:build (&rest keys
                            &key
@@ -995,9 +1084,9 @@ and BUILD-DIR are as per `emc:make'."
   (ignore makefile make-macros targets wait build-dir)
 
   (cl-case build-system
-    (:make (let ((targets (if (string-equal-ignore-case "freash" targets)
+    (:make (let ((targets (if (string-equal-ignore-case "fresh" targets)
 			      targets
-			    (concat "freash " targets)))
+			    (concat "fresh " targets)))
 		 )
 	     (apply #'emc:make :targets targets keys)))
     (:cmake (apply #'emc:cmake :fresh keys))
@@ -1009,8 +1098,10 @@ and BUILD-DIR are as per `emc:make'."
 
 ;; emc::read-build-parms-minibuffer
 
-(defun emc::read-build-parms-minibuffer ()
-  "Read the common build system parameters from minibuffer."
+(defun emc::read-build-parms-minibuffer (&optional prefix-argument)
+  "Read the common build system parameters from minibuffer.
+
+PREFIX-ARGUMENT is possibly bound to PREFIX-ARG."
   (let* ((read-answer-short nil)	; Force long answers.
 	 (cmd
 	  (car
@@ -1025,7 +1116,13 @@ and BUILD-DIR are as per `emc:make'."
 			   ))))
 	  )
 	 )
-    (if prefix-arg
+    
+    (when emc:*verbose*
+      (message "EMC: read build parms from minibuffer (%S %S)."
+	       prefix-arg
+	       prefix-argument))
+    
+    (if prefix-argument
 	(let ((build-system
 	       (read-answer "Build with: "
 			    '((":make" ?m "use 'make.")
@@ -1049,7 +1146,7 @@ and BUILD-DIR are as per `emc:make'."
 		:build-dir build-dir
 		:macros macros
 		:targets targets
-		:prefix current-prefix-arg
+		;; :prefix current-prefix-arg
 		))
       (list cmd
 	    :build-system :make
@@ -1057,7 +1154,7 @@ and BUILD-DIR are as per `emc:make'."
 	    :build-dir default-directory
 	    :macros ""
 	    :targets ""
-	    :prefix current-prefix-arg
+	    ;; :prefix current-prefix-arg
 	    ))
     ))
 
@@ -1067,17 +1164,54 @@ and BUILD-DIR are as per `emc:make'."
 
 (cl-defun emc:run (cmd &rest keys
 		       &key
-		       (prefix 42)
+		       ;; (prefix 42)
 		       (build-system :make)
 		       (source-dir default-directory)
 		       (build-dir default-directory)
 		       (macros "")
 		       (targets "")
+		       (verbose emc:*verbose*)
 		       &allow-other-keys)
-  "Run the \\='making toolchain\\='."
-  (interactive (emc::read-build-parms-minibuffer))
+  "Run the \\='making toolchain\\='.
 
-  (message "EMC: %s %S" cmd keys))
+CMD is the main subcommand to execute (e.g., \\=':build\\=' or
+\\':clean\\=').  BUILD-SYSTEM  is the kind of toolchain to use (for
+the time being \\=':make\\=', the default, or \\=':cmake\\=').
+BUILD-DIR and SOURCE-DIR, defaulting to `default-directory' have the
+usual meaning.  MACROS is a string of \"make like macro\" definitions.
+TARGETS is a string of \"make tartgets\" (space separated) to be
+passed to \\='make\\=' and \\='cmake\\='.  Finally, KEYS, collects all
+the keyword parameters passed as arguments to `emc:run'.  VERBOSE
+controls whether EMC prints out progress messages."
+  
+  (interactive (emc::read-build-parms-minibuffer current-prefix-arg))
+
+  (ignore build-system source-dir build-dir macros targets)
+  
+  (message "EMC: %s %S" cmd keys)
+
+  (let ((emc:*verbose* verbose))
+    (cl-ecase cmd
+      (:setup (apply #'emc:setup keys))
+      (:build (apply #'emc:build keys))
+      (:install (apply #'emc:install keys))
+      (:uninstall (apply #'emc:uninstall keys))
+      (:fresh (apply #'emc:fresh keys))
+      (:clean (apply #'emc:clean keys))
+      ))
+  )
+
+
+;; EMC panel.
+;;
+;; In for an arm, in for a leg.
+
+(cl-defun emc:emc ()
+  "Builds a widgets window that can be used to fill in several parameters.
+
+The window is popped up and the command that will be run is shown in
+the ancillary window."
+  )
 
 
 ;;; Epilogue.
