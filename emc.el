@@ -12,7 +12,7 @@
 ;; Summary: Invoking a C/C++ (and other) build toolchain from Emacs.
 ;;
 ;; Created: 2025-01-02
-;; Version: 2025-04-16
+;; Version: 2025-04-17
 ;;
 ;; Keywords: languages, operating systems, binary platform.
 
@@ -105,13 +105,13 @@
 ;; To invoke 'cmake' the relevant function is `emc:cmake' which takes
 ;; the following "subcommands" (the '<bindir>' below is to be
 ;; interpreted in the 'cmake' sense).
-;; 1. `:setup': which is equivalent to 'cmake <srcdir>' issued in a
+;; 1. `setup': which is equivalent to 'cmake <srcdir>' issued in a
 ;;     `binary' directory.
-;; 2. `:build': which is equivalent to 'cmake --build <bindir>'.
-;; 3. `:install': which is equivalent to 'cmake --install <bindir>'.
-;; 4. `:uninstall': which currently has no `cmake' equivalent.
-;; 5. `:clean': equivalent to 'cmake --build <bindir> -t clean'.
-;; 5. `:fresh': equivalent to 'cmake --fresh <bindir>'.
+;; 2. `build': which is equivalent to 'cmake --build <bindir>'.
+;; 3. `install': which is equivalent to 'cmake --install <bindir>'.
+;; 4. `uninstall': which currently has no `cmake' equivalent.
+;; 5. `clean': equivalent to 'cmake --build <bindir> -t clean'.
+;; 5. `fresh': equivalent to 'cmake --fresh <bindir>'.
 ;;
 
 
@@ -124,32 +124,38 @@
 
 (cl-deftype emc:build-system-type ()
   "The known EMC build-systems."
-  '(member :make :cmake))
+  '(member make cmake)			; Used to have :make :cmake.
+  )
 
 
 (defun emc::normalize-build-system (build-system)
   "Normalize BUILD-SYSTEM to its keyword form."
 
-  ;; This is a bit too rigid.
+  ;; This is a bit too rigid and it will become useless.
   
-  (cond ((or (eq build-system :make)
-	     (eq build-system 'make)
+  (cond ((or (eq build-system 'make)
+	     (eq build-system :make)
 	     (and (stringp build-system)
 		  (or (string-equal-ignore-case build-system ":make")
 		      (string-equal-ignore-case build-system "make"))))
-	 :make)
-	((or (eq build-system :cmake)
-	     (eq build-system 'cmake)
+	 'make)
+	((or (eq build-system 'cmake)
+	     (eq build-system :cmake)
 	     (and (stringp build-system)
 		  (or (string-equal-ignore-case build-system ":cmake")
 		      (string-equal-ignore-case build-system "cmake"))))
-	 :cmake)
+	 'cmake)
 	(t
 	 (error "EMC: error: unknown build system %S" build-system))
 	))
 
 
 (defun emc::normalize-to-symbol (x)
+  "Ensure that the X argument is rendered as a symbol."
+
+  ;; The `cl-typecase' could be made tighter by referring to
+  ;; `emc:build-system-type'.
+  
   (cl-etypecase x
     (symbol x)
     (string (intern x))
@@ -169,11 +175,11 @@ toolchains."
   "The location EMC is loaded from.")
 
 
-(defcustom emc:*default-build-system* :make
+(defcustom emc:*default-build-system* 'make
   "The EMC default build system."
   :group 'emc
   :type 'symbol
-  :options '(:make :cmake)
+  :options '(make cmake)
   )
 
 
@@ -182,47 +188,53 @@ toolchains."
 
 (defun emc::select-cmake-cmd (command)
   "Select a proper \\='cmake\\=' COMMAND line switch."
+
+  ;; The selectors used to be just keywords.
+  
   (cl-ecase (emc::normalize-command command)
-    (:setup
+    (setup
      ;; Nothing really in this case.  This is called to create the
      ;; \\='cmake\\=' makefiles from the \\='CMakeLists.txt\\='
      ;; specifications.
      "")
-    (:build "--build")
-    (:install "--install")
-    (:uninstall
+    ((build :build) "--build")
+    ((install :install)  "--install")
+    ((uninstall :uninstall)
      ;; Come back to fix this.
      "--uninstall")
-    (:clean
+    ((clean :clean)
      ;; Come back to fix this.
      "--clean")
-    (:fresh
+    ((fresh :fresh)
      ;; Come back to fix this.
      "--fresh")
     ))
 
 
 (defun emc::cmake-cmd (kwd sd bd id)
-  "Retunr the proper \\='cmake\\=' command.
+  "Return the proper \\='cmake\\=' command.
 
 KWD is one of `emc::commands' in keyword form.  SD, BD, and ID are the
 source, binary and installation directories that must be used in the
 \\='cmake\\=' commands."
+
+  ;; The selectors used to be just keywords.
   
   (cl-ecase kwd
-    (:setup (concat "cmake " sd))
-    (:build (concat "cmake --build " bd))
-    (:install (concat "cmake --install " id))
-    (:uninstall
+    ((setup :setup) (concat "cmake " sd))
+    ((build :build) (concat "cmake --build " bd))
+    ((install :install) (concat "cmake --install " id))
+    ((uninstall :uninstall)
      ;; Come back to fix this.
      (concat "cmake --uninstall"))
-    (:clean
+    ((clean :clean)
      ;; Come back to fix this.
      (concat "cmake --build " bd " -t clean"))
-    (:fresh
+    ((fresh :fresh)
      ;; Come back to fix this.
      (concat "cmake --fresh " bd))
     ))
+
 
 ;; MSVC definitions.
 ;; -----------------
@@ -328,7 +340,7 @@ without executing it."
 
 (cl-defun emc:msvc-cmake-cmd
     (&key
-     (command :build)
+     (command 'build)			; Used to be :build.
      ((:installation msvc-installation) "Community")
      ((:vcvars-bat msvc-vcvarsall-bat) "vcvars64.bat")
      (build-dir default-directory bd-p)
@@ -400,7 +412,7 @@ folder where \\='make\\=' will be invoked.  DRY-RUN runs the
 
 
 (cl-defun emc:unix-cmake-cmd (&key
-			      (command :build)
+			      (command 'build) ; Used to be :build.
 			      (source-dir default-directory sd-p)
 			      (build-dir default-directory bd-p)
 			      (install-dir default-directory id-p)
@@ -430,29 +442,13 @@ yields
 	 (targets-list (string-split targets nil t " "))
 	 (cmd-kwd (emc::normalize-command command))
 	 )
-    (cl-flet ((cmake-cmd (kwd)
-		(cl-ecase kwd
-		  (:setup (concat "cmake " sd))
-		  (:build (concat "cmake --build " bd))
-		  (:install (concat "cmake --install " id))
-		  (:uninstall
-		   ;; Come back to fix this.
-		   (concat "cmake --uninstall"))
-		  (:clean
-		   ;; Come back to fix this.
-		   (concat "cmake --build " bd " -t clean"))
-		  (:fresh
-		   ;; Come back to fix this.
-		   (concat "cmake --fresh " bd))
-		  ))
-	      )
 	
-      (concat (cmake-cmd cmd-kwd)
-	      (when dry-run " -N ")
-	      (mapconcat #'(lambda (s) (concat " -t " s))
-			 targets-list)
-	      )
-      )))
+    (concat (emc::cmake-cmd cmd-kwd sd bd id)
+	    (when dry-run " -N ")
+	    (mapconcat #'(lambda (s) (concat " -t " s))
+		       targets-list)
+	    )
+    ))
 
 
 ;; Mac OS definitions.
@@ -572,41 +568,41 @@ The commands are the \\='typical\\=' one for a build tool."
 
 (defun emc::normalize-command (command)
   "Return the \\='keyword\\=' form of COMMAND."
-  (cond ((or (eq command :setup)
-	     (eq command 'setup)
+  (cond ((or (eq command 'setup)
+	     (eq command :setup)
 	     (and (stringp command)
 		  (string-equal-ignore-case command "setup")))
-	 :setup)
+	 'setup)
 	
-	((or (eq command :build)
-	     (eq command 'build)
+	((or (eq command 'build)
+	     (eq command :build)
 	     (and (stringp command)
 		  (string-equal-ignore-case command "build")))
-	 :build)
+	 'build)
 
-	((or (eq command :install)
-	     (eq command 'install)
+	((or (eq command 'install)
+	     (eq command :install)
 	     (and (stringp command)
 		  (string-equal-ignore-case command "install")))
-	 :install)
+	 'install)
 
-	((or (eq command :uninstall)
-	     (eq command 'uninstall)
+	((or (eq command 'uninstall)
+	     (eq command :uninstall)
 	     (and (stringp command)
 		  (string-equal-ignore-case command "uninstall")))
-	 :uninstall)
+	 'uninstall)
 	
-	((or (eq command :clean)
-	     (eq command 'clean)
+	((or (eq command 'clean)
+	     (eq command :clean)
 	     (and (stringp command)
 		  (string-equal-ignore-case command "clean")))
-	 :clean)
+	 'clean)
 
-	((or (eq command :fresh)
-	     (eq command 'fresh)
+	((or (eq command 'fresh)
+	     (eq command :fresh)
 	     (and (stringp command)
 		  (string-equal-ignore-case command "fresh")))
-	 :fresh)
+	 'fresh)
 	))
 
 
@@ -704,7 +700,7 @@ progress messages."
                           (targets "")
 			  (dry-run nil)
 			  (wait nil)
-			  (build-system :make)
+			  (build-system 'make)
 			  (build-dir default-directory)
                           &allow-other-keys)
   "Call a \\='make\\=' program in a platform dependend way.
@@ -766,14 +762,14 @@ SYS and BUILD-SYSTEM pair is passed to the generic function.   KEYS is
 ignored."
 
   (ignore keys)
-  (error "EMC: build system %s cannot be used (yet) on %s"
+  (error "EMC: build system %S cannot be used (yet) on %S"
 	 build-system
 	 sys)
   )
 
 
 (cl-defmethod emc:craft-command ((sys (eql 'windows-nt))
-				 (build-system (eql :make))
+				 (build-system (eql 'make))
 				 &rest keys
 				 &key
 				 &allow-other-keys)
@@ -788,7 +784,7 @@ BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
 
 
 (cl-defmethod emc:craft-command ((sys (eql 'darwin))
-				 (build-system (eql :make))
+				 (build-system (eql 'make))
 				 &rest keys
 				 &key
 				 &allow-other-keys)
@@ -803,7 +799,7 @@ BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
 
 
 (cl-defmethod emc:craft-command ((sys (eql 'generic-unix))
-				 (build-system (eql :make))
+				 (build-system (eql 'make))
 				 &rest keys
 				 &key
 				 &allow-other-keys)
@@ -830,13 +826,13 @@ SYS and BUILD-SYSTEM pair is passed to the generic function.   KEYS is
 ignored."
 
   (ignore keys)
-  (error "EMC: build system %s cannot be used (yet) on %s"
+  (error "EMC: build system %S cannot be used (yet) on %S"
 	 build-system
 	 sys)
   )
 
 (cl-defmethod emc:start-making ((sys (eql 'windows-nt))
-				(build-system (eql :make))
+				(build-system (eql 'make))
 				&rest keys
 				&key
 				&allow-other-keys)
@@ -850,7 +846,7 @@ BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
 
 
 (cl-defmethod emc:start-making ((sys (eql 'darwin))
-				(build-system (eql :make))
+				(build-system (eql 'make))
 				&rest keys
 				&key
 				&allow-other-keys)
@@ -864,7 +860,7 @@ BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
 
 
 (cl-defmethod emc:start-making ((sys (eql 'generic-unix))
-				(build-system (eql :make))
+				(build-system (eql 'make))
 				&rest keys
 				&key
 				&allow-other-keys)
@@ -890,8 +886,8 @@ BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
                          &allow-other-keys)
   "Call \\='cmake\\=' in a platform dependend way.
 
-CMD is the \\='cmake\\=' subcommand to invoke (e.g., \\=':build\\=' or
-\\=':install\\=').  KEYS contains the keyword arguments passed to the
+CMD is the \\='cmake\\=' subcommand to invoke (e.g., \\='build\\=' or
+\\='install\\=').  KEYS contains the keyword arguments passed to the
 specialized `emc:X-cmake-cmd' functions via `emc:start-making';
 MAKE-MACROS is a string containing \\='MACRO=DEF\\=' definitions;
 TARGETS is a string of Makefile targets.  WAIT is a boolean telling
@@ -930,46 +926,48 @@ without executing it."
   )
 
 
+;; To be removed.
 
-(cl-defgeneric emc:cmake-gf (cmd &rest keys &key &allow-other-keys)
-  "Interface for \\='cmake\\='.
-
-The CMD parameter works almost like the \\='cmake\\=' command line
-couterpart.  KEYS groups the extra parameters passed to the
-function.")
-
-
-(cl-defmethod emc:cmake-gf ((cmd (eql :build)) &key &allow-other-keys)
-  "Method to invoke \\='cmake\\=' \"build\" command, when CMD is \\=':build\\='."
-  (ignore cmd)
-  )
-
-
-(cl-defmethod emc:cmake-gf ((cmd (eql :install)) &key &allow-other-keys)
-  "Method to invoke \\='cmake\\=' \"build\" command, when CMD is \\=':install\\='."
-  (ignore cmd)
-  )
-
-
-(cl-defmethod emc:cmake-gf ((cmd (eql :uninstall)) &key &allow-other-keys)
-  "Method to invoke \\='cmake\\=' \"build\" command, when CMD is \\=':uninstall\\='."
-  (ignore cmd)
-  )
-
-
-(cl-defmethod emc:cmake-gf ((cmd (eql :build)) &key &allow-other-keys)
-  "Method to invocke \\='cmake\\=' \"build\" command, when CMD is \\=':build\\='."
-  (ignore cmd)
-  )
-
-(cl-defmethod emc:cmake-gf ((cmd (eql :fresh)) &key &allow-other-keys)
-  "Method to invoke \\='cmake\\=' \"build\" command, when CMD is \\=':fresh\\='."
-  (ignore cmd)
-  )
+;; (cl-defgeneric emc:cmake-gf (cmd &rest keys &key &allow-other-keys)
+;;   "Interface for \\='cmake\\='.
+;;
+;; The CMD parameter works almost like the \\='cmake\\=' command line
+;; couterpart.  KEYS groups the extra parameters passed to the
+;; function.")
+;;
+;;
+;; (cl-defmethod emc:cmake-gf ((cmd (eql :build)) &key &allow-other-keys)
+;;   "Method to invoke \\='cmake\\=' \"build\" command, when CMD is \\=':build\\='."
+;;   (ignore cmd)
+;;   )
+;;
+;;
+;; (cl-defmethod emc:cmake-gf ((cmd (eql :install)) &key &allow-other-keys)
+;;   "Method to invoke \\='cmake\\=' \"build\" command, when CMD is \\=':install\\='."
+;;   (ignore cmd)
+;;   )
+;;
+;;
+;; (cl-defmethod emc:cmake-gf ((cmd (eql :uninstall)) &key &allow-other-keys)
+;;   "Method to invoke \\='cmake\\=' \"build\" command, when CMD is \\=':uninstall\\='."
+;;   (ignore cmd)
+;;   )
+;;
+;;
+;; (cl-defmethod emc:cmake-gf ((cmd (eql :build)) &key &allow-other-keys)
+;;   "Method to invocke \\='cmake\\=' \"build\" command, when CMD is \\=':build\\='."
+;;   (ignore cmd)
+;;   )
+;;
+;;
+;; (cl-defmethod emc:cmake-gf ((cmd (eql :fresh)) &key &allow-other-keys)
+;;   "Method to invoke \\='cmake\\=' \"build\" command, when CMD is \\=':fresh\\='."
+;;   (ignore cmd)
+;;   )
 
 
 (cl-defmethod emc:craft-command ((sys (eql 'windows-nt))
-				 (build-system (eql :cmake))
+				 (build-system (eql 'cmake))
 				 &rest keys
 				 &key
 				 &allow-other-keys)
@@ -984,7 +982,7 @@ BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
 
 
 (cl-defmethod emc:craft-command ((sys (eql 'darwin))
-				 (build-system (eql :cmake))
+				 (build-system (eql 'cmake))
 				 &rest keys
 				 &key
 				 &allow-other-keys)
@@ -999,7 +997,7 @@ BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
 
 
 (cl-defmethod emc:craft-command ((sys (eql 'generic-unix))
-				 (build-system (eql :cmake))
+				 (build-system (eql 'cmake))
 				 &rest keys
 				 &key
 				 &allow-other-keys)
@@ -1014,7 +1012,7 @@ BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
 
 
 (cl-defmethod emc:start-making ((sys (eql 'windows-nt))
-				(build-system (eql :cmake))
+				(build-system (eql 'cmake))
 				&rest keys
 				&key
 				&allow-other-keys)
@@ -1028,7 +1026,7 @@ BUILD-SYSTEM equal to \\=':cmake\\=' is invoked with KEYS."
 
 
 (cl-defmethod emc:start-making ((sys (eql 'generic-unix))
-				(build-system (eql :cmake))
+				(build-system (eql 'cmake))
 				&rest keys
 				&key
 				&allow-other-keys)
@@ -1043,7 +1041,7 @@ BUILD-SYSTEM equal to \\=':cmake\\=' is invoked with KEYS."
 
 
 (cl-defmethod emc:start-making ((sys (eql 'darwin))
-				(build-system (eql :cmake))
+				(build-system (eql 'cmake))
 				&rest keys
 				&key
 				&allow-other-keys)
@@ -1064,7 +1062,7 @@ BUILD-SYSTEM equal to \\=':cmake\\=' is invoked with KEYS."
                            (make-macros "")
                            (targets "")
 			   (wait nil)
-			   (build-system :make)
+			   (build-system 'make)
 			   (build-dir default-directory)
                            &allow-other-keys)
   "EMC Build command.
@@ -1079,8 +1077,8 @@ and BUILD-DIR are as per `emc:make'."
   (ignore makefile make-macros targets wait build-dir)
 
   (cl-case build-system
-    (:make t)
-    (:cmake (apply #'emc:cmake :setup keys))
+    ((make :make) t)
+    ((cmake :cmake) (apply #'emc:cmake :setup keys))
     (t
      (error "EMC: error: unknown build system %S" build-system))
     ))
@@ -1092,7 +1090,7 @@ and BUILD-DIR are as per `emc:make'."
                            (make-macros "")
                            (targets "")
 			   (wait nil)
-			   (build-system :make)
+			   (build-system 'make)
 			   (build-dir default-directory)
                            &allow-other-keys)
   "EMC Build command.
@@ -1107,8 +1105,8 @@ and BUILD-DIR are as per `emc:make'."
   (ignore makefile make-macros targets wait build-dir)
 
   (cl-case build-system
-    (:make (apply #'emc:make keys))
-    (:cmake (apply #'emc:cmake :build keys))
+    ((make :make) (apply #'emc:make keys))
+    ((cmake :cmake) (apply #'emc:cmake :build keys))
     (t
      (error "EMC: error: unknown build system %S" build-system))
     ))
@@ -1135,12 +1133,14 @@ and BUILD-DIR are as per `emc:make'."
   (ignore makefile make-macros targets wait build-dir)
 
   (cl-case build-system
-    (:make (let ((targets (if (string-equal-ignore-case "install" targets)
-			      targets
-			    (concat "install " targets)))
-		 )
-	   (apply #'emc:make :targets targets keys)))
-    (:cmake (apply #'emc:cmake :install keys))
+    ((:make make)
+     (let ((targets (if (string-equal-ignore-case "install" targets)
+			targets
+		      (concat "install " targets)))
+	   )
+       (apply #'emc:make :targets targets keys)))
+    ((cmake :cmake)
+     (apply #'emc:cmake :install keys))
     (t
      (error "EMC: error: unknown build system %S" build-system))
     ))
@@ -1152,7 +1152,7 @@ and BUILD-DIR are as per `emc:make'."
                                (make-macros "")
                                (targets "uninstall")
 			       (wait nil)
-			       (build-system :make)
+			       (build-system 'make)
 			       (build-dir default-directory)
                                &allow-other-keys)
   "EMC Uninstall command.
@@ -1167,12 +1167,15 @@ and BUILD-DIR are as per `emc:make'."
   (ignore makefile make-macros targets wait build-dir)
 
   (cl-case build-system
-    (:make (let ((targets (if (string-equal-ignore-case "uninstall" targets)
-			      targets
-			    (concat "uninstall " targets)))
-		 )
-	   (apply #'emc:make :targets targets keys)))
-    (:cmake (apply #'emc:cmake :uninstall keys))
+    ((make :make)
+     (let ((targets (if (string-equal-ignore-case "uninstall" targets)
+			targets
+		      (concat "uninstall " targets)))
+	   )
+       (apply #'emc:make :targets targets keys)))
+    ((cmake :cmake)
+     (warn "EMC: warning: ensure the 'CMakeLists.txt' files handle 'uninstall'")
+     (apply #'emc:cmake :uninstall keys))
     (t
      (error "EMC: error: unknown build system %S" build-system))
     ))
@@ -1184,7 +1187,7 @@ and BUILD-DIR are as per `emc:make'."
                            (make-macros "")
                            (targets "clean")
 			   (wait nil)
-			   (build-system :make)
+			   (build-system 'make)
 			   (build-dir default-directory)
                            &allow-other-keys)
   "EMC Clean command.
@@ -1199,12 +1202,13 @@ and BUILD-DIR are as per `emc:make'."
   (ignore makefile make-macros targets wait build-dir)
 
   (cl-case build-system
-    (:make (let ((targets (if (string-equal-ignore-case "clean" targets)
-			      targets
-			    (concat "clean " targets)))
-		 )
-	   (apply #'emc:make :targets targets keys)))
-    (:cmake (apply #'emc:cmake :clean keys))
+    ((make :make)
+     (let ((targets (if (string-equal-ignore-case "clean" targets)
+			targets
+		      (concat "clean " targets)))
+	   )
+       (apply #'emc:make :targets targets keys)))
+    ((cmake :cmake) (apply #'emc:cmake :clean keys))
     (t
      (error "EMC: error: unknown build system %S" build-system))
     ))
@@ -1216,7 +1220,7 @@ and BUILD-DIR are as per `emc:make'."
                            (make-macros "")
                            (targets "clean")
 			   (wait nil)
-			   (build-system :make)
+			   (build-system 'make)
 			   (build-dir default-directory)
                            &allow-other-keys)
   "EMC Fresh command.
@@ -1231,12 +1235,14 @@ and BUILD-DIR are as per `emc:make'."
   (ignore makefile make-macros targets wait build-dir)
 
   (cl-case build-system
-    (:make (let ((targets (if (string-equal-ignore-case "fresh" targets)
-			      targets
-			    (concat "fresh " targets)))
-		 )
-	     (apply #'emc:make :targets targets keys)))
-    (:cmake (apply #'emc:cmake :fresh keys))
+    ((make :make)
+     (let ((targets (if (string-equal-ignore-case "fresh" targets)
+			targets
+		      (concat "fresh " targets)))
+	   )
+       (warn "EMC: warning: ensure 'Makefile's have a 'fresh' target")
+       (apply #'emc:make :targets targets keys)))
+    ((cmake :cmake) (apply #'emc:cmake :fresh keys))
     (t
      (error "EMC: error: unknown build system %S" build-system))
     ))
@@ -1254,12 +1260,12 @@ PREFIX-ARGUMENT is possibly bound to PREFIX-ARG."
 	  (car
 	   (read-from-string
 	    (read-answer "Command: "
-			 '((":setup" ?s "setup the project")
-			   (":build" ?b "build the project")
-			   (":install" ?i "install the project")
-			   (":uninstall" ?u "uninstall the project")
-			   (":fresh" ?f "freshen the project")
-			   (":clean" ?c "clean the project")
+			 '(("setup" ?s "setup the project")
+			   ("build" ?b "build the project")
+			   ("install" ?i "install the project")
+			   ("uninstall" ?u "uninstall the project")
+			   ("fresh" ?f "freshen the project")
+			   ("clean" ?c "clean the project")
 			   ))))
 	  )
 	 )
@@ -1272,8 +1278,8 @@ PREFIX-ARGUMENT is possibly bound to PREFIX-ARG."
     (if prefix-argument
 	(let ((build-system
 	       (read-answer "Build with: "
-			    '((":make" ?m "use 'make.")
-			      (":cmake" ?c "use 'cmake'.")
+			    '(("make" ?m "use 'make.")
+			      (":make" ?c "use 'cmake'.")
 			      ))
 	       )
 	      (source-dir
@@ -1295,8 +1301,11 @@ PREFIX-ARGUMENT is possibly bound to PREFIX-ARG."
 		:targets targets
 		;; :prefix current-prefix-arg
 		))
+      
+      ;; Default is no prefix arg was given.
+      
       (list cmd
-	    :build-system :make
+	    :build-system 'make
 	    :source-dir default-directory
 	    :build-dir default-directory
 	    :macros ""
@@ -1312,7 +1321,7 @@ PREFIX-ARGUMENT is possibly bound to PREFIX-ARG."
 (cl-defun emc:run (cmd &rest keys
 		       &key
 		       ;; (prefix 42)
-		       (build-system :make)
+		       (build-system 'make)
 		       (source-dir default-directory)
 		       (build-dir default-directory)
 		       (macros "")
@@ -1321,9 +1330,9 @@ PREFIX-ARGUMENT is possibly bound to PREFIX-ARG."
 		       &allow-other-keys)
   "Run the \\='making toolchain\\='.
 
-CMD is the main subcommand to execute (e.g., \\=':build\\=' or
-\\':clean\\=').  BUILD-SYSTEM  is the kind of toolchain to use (for
-the time being \\=':make\\=', the default, or \\=':cmake\\=').
+CMD is the main subcommand to execute (e.g., \\='build\\=' or
+\\'clean\\=').  BUILD-SYSTEM  is the kind of toolchain to use (for
+the time being \\='make\\=', the default, or \\='cmake\\=').
 BUILD-DIR and SOURCE-DIR, defaulting to `default-directory' have the
 usual meaning.  MACROS is a string of \"make like macro\" definitions.
 TARGETS is a string of \"make tartgets\" (space separated) to be
@@ -1339,12 +1348,12 @@ controls whether EMC prints out progress messages."
 
   (let ((emc:*verbose* verbose))
     (cl-ecase cmd
-      (:setup (apply #'emc:setup keys))
-      (:build (apply #'emc:build keys))
-      (:install (apply #'emc:install keys))
-      (:uninstall (apply #'emc:uninstall keys))
-      (:fresh (apply #'emc:fresh keys))
-      (:clean (apply #'emc:clean keys))
+      ((setup :setup) (apply #'emc:setup keys))
+      ((build :build) (apply #'emc:build keys))
+      ((install :install) (apply #'emc:install keys))
+      ((uninstall :uninstall) (apply #'emc:uninstall keys))
+      ((fresh :fresh) (apply #'emc:fresh keys))
+      ((clean :clean) (apply #'emc:clean keys))
       ))
   )
 
@@ -1357,6 +1366,43 @@ controls whether EMC prints out progress messages."
 (require 'wid-edit)
 
 
+(defvar emc::keymap
+  (let ((km (make-sparse-keymap)))
+    (set-keymap-parent km widget-keymap)
+    (define-key km (kbd "<f3>") 'emc::exit-panel)
+    (define-key km (kbd "q") 'emc::exit-panel)
+    (define-key km (kbd "Q") 'emc::exit-panel)
+    km
+    )
+  "The EMC Panel mode key map.
+
+The key map inherits from `widget-keymap'.
+The keys \\='<f3>\\=' (that is, \\='PF3\\='), \\='q\\=' and \\='Q\\='
+exit the EMC panel system.")
+
+
+(defun emc::header-line ()
+  "Create the panel header line."
+  (identity
+   `(:propertize
+     " Emacs Make Compile (EMC, or Emacs Master of Cerimonies)"
+     face (:weight bold))
+   ))
+
+
+(define-derived-mode emc::emc-panel-mode nil "EMC"
+  "The EMC Panel Mode.
+
+The major mode for the EMC simple user inteface.  Just useful to have
+a nice keymap and look.
+
+You an use the function key \\='F3\\=' (i.e., \\='PF3\\=') or the
+\\='[Qq]\\=' keys to exit the EMC panel."
+
+  (use-local-map emc::keymap)
+  )
+
+
 (cl-defun emc:emc ()
   "Builds a widgets window that can be used to fill in several parameters.
 
@@ -1365,15 +1411,17 @@ the ancillary window."
 
   (interactive)
  
-  (switch-to-buffer "*EMC*")
+  (switch-to-buffer "*EMC Interface*")
 
   (kill-all-local-variables)
 
   (let ((inhibit-read-only t))
     (erase-buffer))
 
-  (setq-local emc::build-system-chosen :make)
-  (setq-local emc::command-chosen :build)
+  (emc::emc-panel-mode)
+
+  (setq-local emc::build-system-chosen 'make)
+  (setq-local emc::command-chosen 'build)
 
   (let ((src-dir-widget nil)
 	(bin-dir-widget nil)
@@ -1402,32 +1450,34 @@ the ancillary window."
 		    )))
 	      )
 
-      (widget-insert "Emacs Make Compile (EMC, or Emacs Master of Cerimonies)")
-      (widget-insert "\n\n")
+      ;; (widget-insert "Emacs Make Compile (EMC, or Emacs Master of Cerimonies)")
+      (setq-local header-line-format (emc::header-line))
+      
+      (widget-insert "\n")
       (widget-create 'menu-choice
 		     :tag "Build system "
 		     ;; :void ":make"
 		     :help-echo "Choose a build system"
-		     :value ":make"
+		     :value "make"
 		     :notify (lambda (w &rest ignore)
 			       (ignore ignore)
 			       (message "EMC: chose build system: %S"
 					(widget-value w))
-			       (setq emc::build-system-chosen
-				     (widget-value w))
+			       (setq-local
+				emc::build-system-chosen
+				(emc::normalize-to-symbol (widget-value w)))
 			       (modify-cmd-widget ; (widget-value w)
 				)
 			       )
 
-		     '(choice-item :tag "make" :value ":make")
-		     '(choice-item :tag "cmake" :value ":cmake")
-		 
+		     '(choice-item :tag "make" :value "make")
+		     '(choice-item :tag "cmake" :value "cmake")
 		     )
 
-      (widget-insert "\n\n")
+      (widget-insert "\n")
       (setq src-dir-widget
 	    (widget-create 'directory
-			   :value "."
+			   :value default-directory
 			   :format "Source dir: %v"
 			   :size 40
 			   
@@ -1460,38 +1510,40 @@ the ancillary window."
       (widget-create 'menu-choice
 		     :tag "Command "
 		     :help-echo "Choose the (sub) 'command' to execute."
-		     :value ":build"
+		     :value "build"
 		     :notify (lambda (w &rest ignore)
 			       (ignore ignore)
 			       (message "EMC: chose build system: %S"
 					(widget-value w))
-			       (setq emc::command-chosen
-				     (widget-value w))
+			       (setq-local
+				emc::command-chosen
+				(emc::normalize-to-symbol (widget-value w)))
 			       (modify-cmd-widget ; (widget-value w)
 				)
 			       )
-		     '(choice-item :tag "setup" :value ":setup"
-				   :help-echo (concat "Sets up the build system; "
-						      "useful for 'cmake', not so "
-						      "much for 'make'."))
-		     '(choice-item :tag "build" :value ":build")
-		     '(choice-item :tag "install" :value ":install")
-		     '(choice-item :tag "uninstall" :value ":uninstall")
-		     '(choice-item :tag "clean" :value ":clean")
-		     '(choice-item :tag "fresh" :value ":fresh")
+		     '(choice-item :tag "setup" :value "setup"
+				   :help-echo
+				   (concat "Sets up the build system; "
+					   "useful for 'cmake', not so "
+					   "much for 'make'."))
+		     '(choice-item :tag "build" :value "build")
+		     '(choice-item :tag "install" :value "install")
+		     '(choice-item :tag "uninstall" :value "uninstall")
+		     '(choice-item :tag "clean" :value "clean")
+		     '(choice-item :tag "fresh" :value "fresh")
 		     )
 
   
       (widget-insert "\n")
       ;; (widget-create 'group :tag "Actual command")
-      (widget-insert "Actual command")
+      (widget-insert "Actual command:")
       (widget-insert "\n")
       (setq cmd-widget
 	    (widget-create 'item :value ""))
 
       (widget-insert "\n\n")
       (widget-create 'push-button :value "Run")
-      (widget-insert "   ")
+      (widget-insert "     ")
       (widget-create 'push-button :value "Cancel")
       (widget-insert "\n")
       (use-local-map widget-keymap)
