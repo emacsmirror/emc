@@ -24,3 +24,9 @@ The generic functions will therefore combine these at a minimum.
 Adding `CMake` commands.  Maybe I will have to byte the bullet and
 make three ways generic functions taking into account the *sub
 command* as well.
+
+
+## 2025-04-17
+
+Added `emc:craft-command` in order to make the `emc` *GUI* (using the
+Emacs `widget` library) easier to write.

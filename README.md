@@ -1,4 +1,4 @@
-# EMC
+# EMC -- "Emacs Make Compile" (or "Emacs Master of Ceremonies")
 
 Invoking a C/C++ (and other) build tool-chain from Emacs.
 
@@ -104,6 +104,15 @@ Finally, you can use the `emc:run` command which will ask you which
 several other variables, including the choice of *build system*
 (which, for the time being, is either `:make`, or `:cmake`).
 
+
+### EMC *GUI*
+
+`emc` also has a simple user interface that uses Emacs `widget`
+library.  It may simplify setting up the build system commands,
+especially because it shows the command before executing it.
+
+You can invoke the GUI by invoking the `emc:emc` Emacs command
+(`M-x emc:emc`).
 
 
 ## A NOTE ON FORKING
