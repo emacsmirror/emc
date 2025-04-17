@@ -1,5 +1,5 @@
 ;;; -*- Mode: Emacs-Lisp; lexical-binding: t; -*-
-;;; emc --- Invoking a C/C++ build toolchain from Emacs.
+;;; emc --- Invoking a C/C++ (et al.) build toolchain from Emacs.
 
 ;;; emc.el
 ;;;
@@ -12,7 +12,7 @@
 ;; Summary: Invoking a C/C++ (and other) build toolchain from Emacs.
 ;;
 ;; Created: 2025-01-02
-;; Version: 2025-04-10
+;; Version: 2025-04-16
 ;;
 ;; Keywords: languages, operating systems, binary platform.
 
@@ -125,6 +125,35 @@
 (cl-deftype emc:build-system-type ()
   "The known EMC build-systems."
   '(member :make :cmake))
+
+
+(defun emc::normalize-build-system (build-system)
+  "Normalize BUILD-SYSTEM to its keyword form."
+
+  ;; This is a bit too rigid.
+  
+  (cond ((or (eq build-system :make)
+	     (eq build-system 'make)
+	     (and (stringp build-system)
+		  (or (string-equal-ignore-case build-system ":make")
+		      (string-equal-ignore-case build-system "make"))))
+	 :make)
+	((or (eq build-system :cmake)
+	     (eq build-system 'cmake)
+	     (and (stringp build-system)
+		  (or (string-equal-ignore-case build-system ":cmake")
+		      (string-equal-ignore-case build-system "cmake"))))
+	 :cmake)
+	(t
+	 (error "EMC: error: unknown build system %S" build-system))
+	))
+
+
+(defun emc::normalize-to-symbol (x)
+  (cl-etypecase x
+    (symbol x)
+    (string (intern x))
+    ))
 
 
 (defgroup emc ()
@@ -581,6 +610,17 @@ The commands are the \\='typical\\=' one for a build tool."
 	))
 
 
+(cl-defgeneric emc:craft-command (sys build-system  &rest keys
+				     &key
+				     &allow-other-keys)
+  "Craft (shape, build, evoke) the actual command to be executed.
+
+SYS is the platform (cf., `system'), BUILD-SYSTEM is the tool and KEYS
+contains the extra parameters needed."
+  ;; `flycheck-mode' needs to get its act together.
+  )
+
+
 (cl-defgeneric emc:start-making (sys build-system &rest keys
 				     &key
 				     &allow-other-keys)
@@ -713,6 +753,69 @@ executing it."
   )
 
 
+;; make/nmake `emc:craft-command' methods.
+
+(cl-defmethod emc:craft-command ((sys t) (build-system t)
+				 &rest keys
+				 &key
+				 &allow-other-keys)
+  "Raise and error.
+
+This is a catch-all method that gets Invoked when a generic/unknown
+SYS and BUILD-SYSTEM pair is passed to the generic function.   KEYS is
+ignored."
+
+  (ignore keys)
+  (error "EMC: build system %s cannot be used (yet) on %s"
+	 build-system
+	 sys)
+  )
+
+
+(cl-defmethod emc:craft-command ((sys (eql 'windows-nt))
+				 (build-system (eql :make))
+				 &rest keys
+				 &key
+				 &allow-other-keys)
+  "Dispatch to the specialized machinery.
+
+The proper calls for the pair SYS equal to \\='windows-nt\\=' and
+BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
+  
+  (ignore sys build-system)
+  (apply #'emc:msvc-make-cmd keys)
+  )
+
+
+(cl-defmethod emc:craft-command ((sys (eql 'darwin))
+				 (build-system (eql :make))
+				 &rest keys
+				 &key
+				 &allow-other-keys)
+  "Dispatch to the specialized machinery.
+
+The proper calls for the pair SYS equal to \\='windows-nt\\=' and
+BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
+  
+  (ignore sys build-system)
+  (apply #'emc:macos-make-cmd keys)
+  )
+
+
+(cl-defmethod emc:craft-command ((sys (eql 'generic-unix))
+				 (build-system (eql :make))
+				 &rest keys
+				 &key
+				 &allow-other-keys)
+  "Dispatch to the specialized machinery.
+
+The proper calls for the pair SYS equal to \\='windows-nt\\=' and
+BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
+  
+  (ignore sys build-system)
+  (apply #'emc:unix-make-cmd keys)
+  )
+
 
 ;; make/nmake `emc:start-making' methods.
 
@@ -720,17 +823,17 @@ executing it."
 				&rest keys
 				&key
 				&allow-other-keys)
-  "Raise an error.
+  "Raise and error.
 
 This is a catch-all method that gets Invoked when a generic/unknown
 SYS and BUILD-SYSTEM pair is passed to the generic function.   KEYS is
 ignored."
+
   (ignore keys)
   (error "EMC: build system %s cannot be used (yet) on %s"
 	 build-system
 	 sys)
   )
-
 
 (cl-defmethod emc:start-making ((sys (eql 'windows-nt))
 				(build-system (eql :make))
@@ -865,6 +968,50 @@ function.")
   )
 
 
+(cl-defmethod emc:craft-command ((sys (eql 'windows-nt))
+				 (build-system (eql :cmake))
+				 &rest keys
+				 &key
+				 &allow-other-keys)
+  "Dispatch to the specialized machinery.
+
+The proper calls for the pair SYS equal to \\='windows-nt\\=' and
+BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
+  
+  (ignore sys build-system)
+  (apply #'emc:msvc-cmake-cmd keys)
+  )
+
+
+(cl-defmethod emc:craft-command ((sys (eql 'darwin))
+				 (build-system (eql :cmake))
+				 &rest keys
+				 &key
+				 &allow-other-keys)
+  "Dispatch to the specialized machinery.
+
+The proper calls for the pair SYS equal to \\='windows-nt\\=' and
+BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
+  
+  (ignore sys build-system)
+  (apply #'emc:macos-cmake-cmd keys)
+  )
+
+
+(cl-defmethod emc:craft-command ((sys (eql 'generic-unix))
+				 (build-system (eql :cmake))
+				 &rest keys
+				 &key
+				 &allow-other-keys)
+  "Dispatch to the specialized machinery.
+
+The proper calls for the pair SYS equal to \\='windows-nt\\=' and
+BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
+  
+  (ignore sys build-system)
+  (apply #'emc:unix-cmake-cmd keys)
+  )
+
 
 (cl-defmethod emc:start-making ((sys (eql 'windows-nt))
 				(build-system (eql :cmake))
@@ -935,7 +1082,7 @@ and BUILD-DIR are as per `emc:make'."
     (:make t)
     (:cmake (apply #'emc:cmake :setup keys))
     (t
-     (error "EMC: error: unknown build system %s" build-system))
+     (error "EMC: error: unknown build system %S" build-system))
     ))
 
 
@@ -963,7 +1110,7 @@ and BUILD-DIR are as per `emc:make'."
     (:make (apply #'emc:make keys))
     (:cmake (apply #'emc:cmake :build keys))
     (t
-     (error "EMC: error: unknown build system %s" build-system))
+     (error "EMC: error: unknown build system %S" build-system))
     ))
 
 
@@ -995,7 +1142,7 @@ and BUILD-DIR are as per `emc:make'."
 	   (apply #'emc:make :targets targets keys)))
     (:cmake (apply #'emc:cmake :install keys))
     (t
-     (error "EMC: error: unknown build system %s" build-system))
+     (error "EMC: error: unknown build system %S" build-system))
     ))
 
 
@@ -1027,7 +1174,7 @@ and BUILD-DIR are as per `emc:make'."
 	   (apply #'emc:make :targets targets keys)))
     (:cmake (apply #'emc:cmake :uninstall keys))
     (t
-     (error "EMC: error: unknown build system %s" build-system))
+     (error "EMC: error: unknown build system %S" build-system))
     ))
 
 
@@ -1059,7 +1206,7 @@ and BUILD-DIR are as per `emc:make'."
 	   (apply #'emc:make :targets targets keys)))
     (:cmake (apply #'emc:cmake :clean keys))
     (t
-     (error "EMC: error: unknown build system %s" build-system))
+     (error "EMC: error: unknown build system %S" build-system))
     ))
 
 
@@ -1091,7 +1238,7 @@ and BUILD-DIR are as per `emc:make'."
 	     (apply #'emc:make :targets targets keys)))
     (:cmake (apply #'emc:cmake :fresh keys))
     (t
-     (error "EMC: error: unknown build system %s" build-system))
+     (error "EMC: error: unknown build system %S" build-system))
     ))
 
 
@@ -1206,12 +1353,150 @@ controls whether EMC prints out progress messages."
 ;;
 ;; In for an arm, in for a leg.
 
+(require 'widget)
+(require 'wid-edit)
+
+
 (cl-defun emc:emc ()
   "Builds a widgets window that can be used to fill in several parameters.
 
 The window is popped up and the command that will be run is shown in
 the ancillary window."
-  )
+
+  (interactive)
+ 
+  (switch-to-buffer "*EMC*")
+
+  (kill-all-local-variables)
+
+  (let ((inhibit-read-only t))
+    (erase-buffer))
+
+  (setq-local emc::build-system-chosen :make)
+  (setq-local emc::command-chosen :build)
+
+  (let ((src-dir-widget nil)
+	(bin-dir-widget nil)
+	(cmd-widget nil))
+    (cl-flet (
+	      ;; (modify-cmd-widget (cmd)
+	      ;;   (widget-value-set cmd-widget cmd))
+	      (modify-cmd-widget ()
+		(save-excursion
+		  (let* ((build-system emc::build-system-chosen)
+			 (cmd emc::command-chosen)
+			 (src-dir (widget-value src-dir-widget))
+			 (bin-dir (widget-value bin-dir-widget))
+			 (cmdline (emc:craft-command system-type
+						     build-system
+						     :source-dir src-dir
+						     :build-dir bin-dir))
+			 )
+		    (ignore cmd)
+		    (message "EMC: %s %s %s %s"
+			     build-system
+			     src-dir
+			     bin-dir
+			     cmdline)
+		    (widget-value-set cmd-widget cmdline)
+		    )))
+	      )
+
+      (widget-insert "Emacs Make Compile (EMC, or Emacs Master of Cerimonies)")
+      (widget-insert "\n\n")
+      (widget-create 'menu-choice
+		     :tag "Build system "
+		     ;; :void ":make"
+		     :help-echo "Choose a build system"
+		     :value ":make"
+		     :notify (lambda (w &rest ignore)
+			       (ignore ignore)
+			       (message "EMC: chose build system: %S"
+					(widget-value w))
+			       (setq emc::build-system-chosen
+				     (widget-value w))
+			       (modify-cmd-widget ; (widget-value w)
+				)
+			       )
+
+		     '(choice-item :tag "make" :value ":make")
+		     '(choice-item :tag "cmake" :value ":cmake")
+		 
+		     )
+
+      (widget-insert "\n\n")
+      (setq src-dir-widget
+	    (widget-create 'directory
+			   :value "."
+			   :format "Source dir: %v"
+			   :size 40
+			   
+			   :notify (lambda (w &rest ignore)
+				     (ignore w ignore)
+				     (save-excursion
+				       (modify-cmd-widget ; (widget-value w)
+					)))
+
+
+			   :help-echo "The directory where the 'source' is found."
+			   ))
+      (widget-insert "\n")
+      (setq bin-dir-widget
+	    (widget-create 'directory
+			   :value default-directory
+			   :format "Build dir : %v"
+			   :size 40
+			   
+			   :notify (lambda (w &rest ignore)
+				     (ignore w ignore)
+				     (save-excursion
+				       (modify-cmd-widget ; (widget-value w)
+					)))
+			   
+			   :help-echo "The directory where the 'source' is built."
+			   ))
+
+      (widget-insert "\n\n")
+      (widget-create 'menu-choice
+		     :tag "Command "
+		     :help-echo "Choose the (sub) 'command' to execute."
+		     :value ":build"
+		     :notify (lambda (w &rest ignore)
+			       (ignore ignore)
+			       (message "EMC: chose build system: %S"
+					(widget-value w))
+			       (setq emc::command-chosen
+				     (widget-value w))
+			       (modify-cmd-widget ; (widget-value w)
+				)
+			       )
+		     '(choice-item :tag "setup" :value ":setup"
+				   :help-echo (concat "Sets up the build system; "
+						      "useful for 'cmake', not so "
+						      "much for 'make'."))
+		     '(choice-item :tag "build" :value ":build")
+		     '(choice-item :tag "install" :value ":install")
+		     '(choice-item :tag "uninstall" :value ":uninstall")
+		     '(choice-item :tag "clean" :value ":clean")
+		     '(choice-item :tag "fresh" :value ":fresh")
+		     )
+
+  
+      (widget-insert "\n")
+      ;; (widget-create 'group :tag "Actual command")
+      (widget-insert "Actual command")
+      (widget-insert "\n")
+      (setq cmd-widget
+	    (widget-create 'item :value ""))
+
+      (widget-insert "\n\n")
+      (widget-create 'push-button :value "Run")
+      (widget-insert "   ")
+      (widget-create 'push-button :value "Cancel")
+      (widget-insert "\n")
+      (use-local-map widget-keymap)
+      (widget-setup)
+      )))
 
 
 ;;; Epilogue.
