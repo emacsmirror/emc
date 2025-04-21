@@ -92,7 +92,7 @@ To invoke `cmake` the relevant function is `emc:cmake` which takes
 the following "sub-commands" (the `<bindir>` below is to be
 interpreted in the `cmake` sense).
 1. `:setup`: which is equivalent to `cmake <srcdir>` issued in a
-    `binary` directory.
+   `binary` directory.
 2. `:build`: which is equivalent to `cmake --build <bindir>`.
 3. `:install`: which is equivalent to `cmake --install <bindir>`.
 4. `:uninstall`: which currently has no `cmake` equivalent.
@@ -112,7 +112,7 @@ library.  It may simplify setting up the build system commands,
 especially because it shows the command before executing it.
 
 You can invoke the GUI by invoking the `emc:emc` Emacs command
-(`M-x emc:emc`).
+(`M-x emc:emc`).  Using it should be rather straightforward.
 
 
 ## A NOTE ON FORKING
