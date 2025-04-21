@@ -106,7 +106,7 @@
 ;; the following "subcommands" (the '<bindir>' below is to be
 ;; interpreted in the 'cmake' sense).
 ;; 1. `setup': which is equivalent to 'cmake <srcdir>' issued in a
-;;     `binary' directory.
+;;    `binary' directory.
 ;; 2. `build': which is equivalent to 'cmake --build <bindir>'.
 ;; 3. `install': which is equivalent to 'cmake --install <bindir>'.
 ;; 4. `uninstall': which currently has no `cmake' equivalent.
