@@ -12,7 +12,7 @@
 ;; Summary: Invoking a C/C++ (and other) build toolchain from Emacs.
 ;;
 ;; Created: 2025-01-02
-;; Version: 2025-04-17
+;; Version: 2025-04-21
 ;;
 ;; Keywords: languages, operating systems, binary platform.
 
@@ -150,6 +150,10 @@
 	))
 
 
+;; The following functions are needed because I shuffle back and forth
+;; between strings and symbols.  (And because ELisp does not seem to
+;; do coercion as CL STRING.
+
 (defun emc::normalize-to-symbol (x)
   "Ensure that the X argument is rendered as a symbol."
 
@@ -159,6 +163,18 @@
   (cl-etypecase x
     (symbol x)
     (string (intern x))
+    ))
+
+
+(defun emc::normalize-to-string (x)
+  "Ensure that the X argument is rendered as a symbol."
+
+  ;; The `cl-typecase' could be made tighter by referring to
+  ;; `emc:build-system-type'.
+  
+  (cl-etypecase x
+    (symbol (symbol-name x))
+    (string x)
     ))
 
 
@@ -606,9 +622,10 @@ The commands are the \\='typical\\=' one for a build tool."
 	))
 
 
-(cl-defgeneric emc:craft-command (sys build-system  &rest keys
-				     &key
-				     &allow-other-keys)
+(cl-defgeneric emc:craft-command (sys build-system
+				      &rest keys
+				      &key
+				      &allow-other-keys)
   "Craft (shape, build, evoke) the actual command to be executed.
 
 SYS is the platform (cf., `system'), BUILD-SYSTEM is the tool and KEYS
@@ -768,25 +785,54 @@ ignored."
   )
 
 
+(defun emc::craft-make-targets (command targets)
+  "Craft the final set of targets for a \\='make\\=' call.
+
+COMMAND is the EMC command indicator (a symbol) and TARGETS is the
+initial target list (actually a space separated string)."
+  
+  (let ((cmd-target (if (eq command 'build)
+			"" 		; Maybe it should be "all".
+		      (emc::normalize-to-string command)))
+	)
+    (cond ((and (not (eq command 'build))
+		(string-search cmd-target targets))
+	   targets)
+	  ((eq command 'build)
+	   targets)
+	  (t
+	   (concat cmd-target " " targets))))
+  )
+
+    
 (cl-defmethod emc:craft-command ((sys (eql 'windows-nt))
 				 (build-system (eql 'make))
 				 &rest keys
 				 &key
+				 (command 'buil)
+				 (targets "")
 				 &allow-other-keys)
   "Dispatch to the specialized machinery.
 
 The proper calls for the pair SYS equal to \\='windows-nt\\=' and
-BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
+BUILD-SYSTEM equal to \\='make\\=' is invoked with KEYS."
   
   (ignore sys build-system)
-  (apply #'emc:msvc-make-cmd keys)
-  )
+  (let ((tgts (emc::craft-make-targets command targets)))
+    
+    (message "EMC: craft-command: MSVC nmake: %S %S" command tgts)
+    (cl-remf keys :targets)
+    (message "EMC: craft-command: %S" keys)
+    (apply #'emc:msvc-make-cmd :targets tgts keys)
+    ))
 
 
 (cl-defmethod emc:craft-command ((sys (eql 'darwin))
 				 (build-system (eql 'make))
 				 &rest keys
 				 &key
+				 (command 'build)
+				 (targets "")
 				 &allow-other-keys)
   "Dispatch to the specialized machinery.
 
@@ -794,14 +840,22 @@ The proper calls for the pair SYS equal to \\='windows-nt\\=' and
 BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
   
   (ignore sys build-system)
-  (apply #'emc:macos-make-cmd keys)
-  )
+
+  (let ((tgts (emc::craft-make-targets command targets)))
+    
+    (message "EMC: craft-command: MacOS make: %S %S" command tgts)
+    (cl-remf keys :targets)
+    (message "EMC: craft-command: %S" keys)
+    (apply #'emc:unix-make-cmd :targets tgts keys)
+    ))
 
 
 (cl-defmethod emc:craft-command ((sys (eql 'generic-unix))
 				 (build-system (eql 'make))
 				 &rest keys
 				 &key
+				 (command 'build)
+				 (targets "")
 				 &allow-other-keys)
   "Dispatch to the specialized machinery.
 
@@ -809,8 +863,14 @@ The proper calls for the pair SYS equal to \\='windows-nt\\=' and
 BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
   
   (ignore sys build-system)
-  (apply #'emc:unix-make-cmd keys)
-  )
+
+  (let ((tgts (emc::craft-make-targets command targets)))
+
+    (message "EMC: craft-command: UNX make: %S %S" command tgts)
+    (cl-remf keys :targets)
+    (message "EMC: craft-command: %S" keys)
+    (apply #'emc:unix-make-cmd :targets tgts keys)
+    ))
 
 
 ;; make/nmake `emc:start-making' methods.
@@ -1381,6 +1441,12 @@ The keys \\='<f3>\\=' (that is, \\='PF3\\='), \\='q\\=' and \\='Q\\='
 exit the EMC panel system.")
 
 
+(defvar-local emc::from-buffer nil
+  "The buffer from which the `emc:emc' command is called.
+
+The value is NIL if not set within the `emc:emc' function.")
+
+
 (defun emc::header-line ()
   "Create the panel header line."
   (identity
@@ -1399,11 +1465,14 @@ a nice keymap and look.
 You an use the function key \\='F3\\=' (i.e., \\='PF3\\=') or the
 \\='[Qq]\\=' keys to exit the EMC panel."
 
+  (message "EMC: using local map %S"
+	   (keymap-lookup emc::keymap "q"))
   (use-local-map emc::keymap)
+  (message "EMC: keymap is now %s" (current-local-map))
   )
 
 
-(cl-defun emc:emc ()
+(cl-defun emc:emc (&aux (from-buffer (current-buffer)))
   "Builds a widgets window that can be used to fill in several parameters.
 
 The window is popped up and the command that will be run is shown in
@@ -1420,6 +1489,14 @@ the ancillary window."
 
   (emc::emc-panel-mode)
 
+  (message "EMC: key 'q' in current-local-map %S"
+	   (keymap-lookup (current-local-map) "q"))
+  (message "EMC: key 'q' in current-global-map %S"
+	   (keymap-lookup (current-global-map) "q"))
+  (message "EMC: local == global ? %S"
+	   (eql (current-local-map) (current-global-map)))
+
+  (setq-local emc::from-buffer from-buffer)
   (setq-local emc::build-system-chosen 'make)
   (setq-local emc::command-chosen 'build)
 
@@ -1437,10 +1514,11 @@ the ancillary window."
 			 (bin-dir (widget-value bin-dir-widget))
 			 (cmdline (emc:craft-command system-type
 						     build-system
+						     :command cmd
 						     :source-dir src-dir
 						     :build-dir bin-dir))
 			 )
-		    (ignore cmd)
+
 		    (message "EMC: %s %s %s %s"
 			     build-system
 			     src-dir
@@ -1544,10 +1622,35 @@ the ancillary window."
       (widget-insert "\n\n")
       (widget-create 'push-button :value "Run")
       (widget-insert "     ")
-      (widget-create 'push-button :value "Cancel")
+      (widget-create 'push-button
+		     :value "Cancel"
+		     :notify (lambda (w &rest args)
+			       (ignore w args)
+			       (emc::exit-panel))
+		     )
       (widget-insert "\n")
-      (use-local-map widget-keymap)
-      (widget-setup)
+
+      (prog1 (widget-setup)
+	(goto-char (point-min))
+	(widget-forward 1))
+      )))
+
+
+(defun emc::exit-panel () 
+  "Exit the EMC panel (and buffer)."
+
+  (interactive)
+
+  (let ((emc-panel (current-buffer)))	; I could find it by name.
+
+    (with-current-buffer emc-panel
+      ;; Order of `switch-to-buffer' and `kill-buffer' is important.
+      (if (and (bufferp emc::from-buffer)
+	       (buffer-live-p emc::from-buffer))
+	  (switch-to-buffer emc::from-buffer nil t)
+	(switch-to-buffer nil))
+      
+      (kill-buffer emc-panel)
       )))
 
 
