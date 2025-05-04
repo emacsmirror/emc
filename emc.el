@@ -1,5 +1,5 @@
-;;; -*- Mode: Emacs-Lisp; lexical-binding: t; -*-
-;;; emc --- Invoking a C/C++ (et al.) build toolchain from Emacs.
+;;; emc --- Invoking a C/C++ (et al.) build toolchain from Emacs. -*- Mode: Emacs-Lisp; lexical-binding: t; -*-
+
 
 ;;; emc.el
 ;;;
@@ -12,7 +12,7 @@
 ;; Summary: Invoking a C/C++ (and other) build toolchain from Emacs.
 ;;
 ;; Created: 2025-01-02
-;; Version: 2025-04-21
+;; Version: 2025-05-04
 ;;
 ;; Keywords: languages, operating systems, binary platform.
 
@@ -1384,6 +1384,7 @@ PREFIX-ARGUMENT is possibly bound to PREFIX-ARG."
 		       (build-system 'make)
 		       (source-dir default-directory)
 		       (build-dir default-directory)
+		       (install-dir default-directory)
 		       (macros "")
 		       (targets "")
 		       (verbose emc:*verbose*)
@@ -1391,18 +1392,18 @@ PREFIX-ARGUMENT is possibly bound to PREFIX-ARG."
   "Run the \\='making toolchain\\='.
 
 CMD is the main subcommand to execute (e.g., \\='build\\=' or
-\\'clean\\=').  BUILD-SYSTEM  is the kind of toolchain to use (for
-the time being \\='make\\=', the default, or \\='cmake\\=').
-BUILD-DIR and SOURCE-DIR, defaulting to `default-directory' have the
+\\'clean\\=').  BUILD-SYSTEM is the kind of toolchain to use (for the
+time being \\='make\\=', the default, or \\='cmake\\=').  BUILD-DIR,
+SOURCE-DIR, and INSTALL-DIR, defaulting to `default-directory' have the
 usual meaning.  MACROS is a string of \"make like macro\" definitions.
-TARGETS is a string of \"make tartgets\" (space separated) to be
-passed to \\='make\\=' and \\='cmake\\='.  Finally, KEYS, collects all
-the keyword parameters passed as arguments to `emc:run'.  VERBOSE
-controls whether EMC prints out progress messages."
+TARGETS is a string of \"make tartgets\" (space separated) to be passed
+to \\='make\\=' and \\='cmake\\='.  Finally, KEYS, collects all the
+keyword parameters passed as arguments to `emc:run'.  VERBOSE controls
+whether EMC prints out progress messages."
   
   (interactive (emc::read-build-parms-minibuffer current-prefix-arg))
 
-  (ignore build-system source-dir build-dir macros targets)
+  (ignore build-system source-dir build-dir install-dir macros targets)
   
   (message "EMC: %s %S" cmd keys)
 
@@ -1502,6 +1503,7 @@ the ancillary window."
 
   (let ((src-dir-widget nil)
 	(bin-dir-widget nil)
+	(install-dir-widget nil)
 	(cmd-widget nil))
     (cl-flet (
 	      ;; (modify-cmd-widget (cmd)
@@ -1512,11 +1514,15 @@ the ancillary window."
 			 (cmd emc::command-chosen)
 			 (src-dir (widget-value src-dir-widget))
 			 (bin-dir (widget-value bin-dir-widget))
-			 (cmdline (emc:craft-command system-type
-						     build-system
-						     :command cmd
-						     :source-dir src-dir
-						     :build-dir bin-dir))
+			 (install-dir (widget-value install-dir-widget))
+			 (cmdline
+			  (emc:craft-command system-type
+					     build-system
+					     :command cmd
+					     :source-dir src-dir
+					     :build-dir bin-dir
+					     :install-dir install-dir
+					     ))
 			 )
 
 		    (message "EMC: %s %s %s %s"
@@ -1553,10 +1559,12 @@ the ancillary window."
 		     )
 
       (widget-insert "\n")
+
+
       (setq src-dir-widget
 	    (widget-create 'directory
 			   :value default-directory
-			   :format "Source dir: %v"
+			   :format "Source dir  : %v"
 			   :size 40
 			   
 			   :notify (lambda (w &rest ignore)
@@ -1566,13 +1574,15 @@ the ancillary window."
 					)))
 
 
-			   :help-echo "The directory where the 'source' is found."
+			   :help-echo
+			   "The directory where the 'source' is found."
 			   ))
       (widget-insert "\n")
+		     
       (setq bin-dir-widget
 	    (widget-create 'directory
 			   :value default-directory
-			   :format "Build dir : %v"
+			   :format "Build dir   : %v"
 			   :size 40
 			   
 			   :notify (lambda (w &rest ignore)
@@ -1581,9 +1591,27 @@ the ancillary window."
 				       (modify-cmd-widget ; (widget-value w)
 					)))
 			   
-			   :help-echo "The directory where the 'source' is built."
+			   :help-echo
+			   "The directory where the 'source' is built."
 			   ))
+      (widget-insert "\n")
 
+      (setq install-dir-widget
+	    (widget-create 'directory
+			   :value default-directory
+			   :format "Install dir : %v"
+			   :size 40
+			   
+			   :notify (lambda (w &rest ignore)
+				     (ignore w ignore)
+				     (save-excursion
+				       (modify-cmd-widget ; (widget-value w)
+					)))
+			   
+			   :help-echo
+			   "The directory where the build result is 'installed'."
+			   ))
+      
       (widget-insert "\n\n")
       (widget-create 'menu-choice
 		     :tag "Command "
@@ -1604,13 +1632,31 @@ the ancillary window."
 				   (concat "Sets up the build system; "
 					   "useful for 'cmake', not so "
 					   "much for 'make'."))
-		     '(choice-item :tag "build" :value "build")
-		     '(choice-item :tag "install" :value "install")
-		     '(choice-item :tag "uninstall" :value "uninstall")
-		     '(choice-item :tag "clean" :value "clean")
-		     '(choice-item :tag "fresh" :value "fresh")
+		     '(choice-item :tag "build" :value "build"
+				   :help-echo "Invokes the build system.")
+		     '(choice-item :tag "install" :value "install"
+				   :help-echo
+				   (concat "Invokes the build system "
+					   "installation machinery."))
+		     '(choice-item :tag "uninstall" :value "uninstall"
+				   :help-echo
+				    (concat "Invokes the build system "
+					    "uninstallation machinery. "
+					    "Note that 'cmake' "
+					    "requires  special "
+					    "provisions to make the "
+					    "'uninstall' command available."))
+				    
+		     '(choice-item :tag "clean" :value "clean"
+				   :help-echo "Invokes the cleanup machinery.")
+		     '(choice-item :tag "fresh" :value "fresh"
+				   :help-echo
+				   (concat "For 'cmake' it invokes the "
+					   "eponimous command; for "
+					   "'make' it may generate an error.")
+				   )
 		     )
-
+      
   
       (widget-insert "\n")
       ;; (widget-create 'group :tag "Actual command")
@@ -1620,13 +1666,36 @@ the ancillary window."
 	    (widget-create 'item :value ""))
 
       (widget-insert "\n\n")
-      (widget-create 'push-button :value "Run")
+      (widget-create 'push-button :value "Run"
+		     :notify (lambda (w &rest args)
+			       (ignore w args)
+			       
+			       ))
       (widget-insert "     ")
       (widget-create 'push-button
 		     :value "Cancel"
 		     :notify (lambda (w &rest args)
 			       (ignore w args)
 			       (emc::exit-panel))
+		     )
+      (widget-insert "     ")
+      (widget-create 'push-button
+		     :value "Mess src dir"
+		     :notify (lambda (w &rest args)
+			       (ignore w args)
+			       (message "Widget %s"
+					(widget-get src-dir-widget :widget))
+			       (widget-browse src-dir-widget)
+			       (widget-delete src-dir-widget)
+			       )
+		     )
+      (widget-insert "     ")
+      (widget-create 'push-button
+		     :value "Redo src dir"
+		     :notify (lambda (w &rest args)
+			       (ignore w args)
+			       ;; (widget-insert src-dir-widget)
+			       )
 		     )
       (widget-insert "\n")
 
