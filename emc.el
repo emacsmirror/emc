@@ -12,7 +12,7 @@
 ;; Summary: Invoking a C/C++ (and other) build toolchain from Emacs.
 ;;
 ;; Created: 2025-01-02
-;; Version: 2025-05-04
+;; Version: 2025-05-05
 ;;
 ;; Keywords: languages, operating systems, binary platform.
 
@@ -860,7 +860,9 @@ BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
   "Dispatch to the specialized machinery.
 
 The proper calls for the pair SYS equal to \\='windows-nt\\=' and
-BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
+BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS.  COMMAND is
+the \\='subcommand\\=' (ignored by \\='make\\=') and TARGETS are the
+targets to pass down."
   
   (ignore sys build-system)
 
@@ -1336,29 +1338,34 @@ PREFIX-ARGUMENT is possibly bound to PREFIX-ARG."
 	       prefix-argument))
     
     (if prefix-argument
-	(let ((build-system
-	       (read-answer "Build with: "
-			    '(("make" ?m "use 'make.")
-			      (":make" ?c "use 'cmake'.")
-			      ))
+	(let* ((build-system
+		(read-answer "Build with: "
+			     '(("make" ?m "use 'make'.")
+			       ("cmake" ?c "use 'cmake'.")
+			       ))
+		)
+	       (makefile
+		(when (string-equal build-system "make")
+		  (read-from-minibuffer "Makefile: "
+					nil nil nil nil "Makefile")))
+	       (source-dir
+		(expand-file-name
+		 (read-directory-name "Source directory: ")))
+	       (build-dir
+		(expand-file-name
+		 (read-directory-name "Build directory: ")))
+	       (macros
+		(read-from-minibuffer "Macros: " nil nil nil nil ""))
+	       (targets
+		(read-from-minibuffer "Targets: " nil nil nil nil ""))
 	       )
-	      (source-dir
-	       (expand-file-name
-		(read-directory-name "Source directory: ")))
-	      (build-dir
-	       (expand-file-name
-		(read-directory-name "Build directory: ")))
-	      (macros
-	       (read-from-minibuffer "Macros: " nil nil nil nil ""))
-	      (targets
-	       (read-from-minibuffer "Targets: " nil nil nil nil ""))
-	      )
 	  (list cmd
 		:build-system (car (read-from-string build-system))
 		:source-dir source-dir
 		:build-dir build-dir
 		:macros macros
 		:targets targets
+		:makefile makefile
 		;; :prefix current-prefix-arg
 		))
       
@@ -1370,6 +1377,65 @@ PREFIX-ARGUMENT is possibly bound to PREFIX-ARG."
 	    :build-dir default-directory
 	    :macros ""
 	    :targets ""
+	    :makefile "Makefile"
+	    ;; :prefix current-prefix-arg
+	    ))
+    ))
+
+
+;; emc::read-command-parms-minibuffer
+
+(defun emc::read-command-parms-minibuffer (&optional prefix-argument)
+  "Read the common command parameters from minibuffer.
+
+PREFIX-ARGUMENT is possibly bound to PREFIX-ARG."
+  (let ((read-answer-short nil)	; Force long answers.
+	)
+    
+    (when emc:*verbose*
+      (message "EMC: read build parms from minibuffer (%S %S)."
+	       prefix-arg
+	       prefix-argument))
+    
+    (if prefix-argument
+	(let* ((build-system
+		(read-answer "Build with: "
+			     '(("make" ?m "use 'make'.")
+			       ("cmake" ?c "use 'cmake'.")
+			       ))
+		)
+	       (makefile
+		(when (string-equal build-system "make")
+		  (read-from-minibuffer "Makefile: "
+					nil nil nil nil "Makefile")))
+	       (source-dir
+		(expand-file-name
+		 (read-directory-name "Source directory: ")))
+	       (build-dir
+		(expand-file-name
+		 (read-directory-name "Build directory: ")))
+	       (macros
+		(read-from-minibuffer "Macros: " nil nil nil nil ""))
+	       (targets
+		(read-from-minibuffer "Targets: " nil nil nil nil ""))
+	       )
+	  (list :build-system (car (read-from-string build-system))
+		:source-dir source-dir
+		:build-dir build-dir
+		:macros macros
+		:targets targets
+		:makefile makefile
+		;; :prefix current-prefix-arg
+		))
+      
+      ;; Default is no prefix arg was given.
+      
+      (list :build-system 'make
+	    :source-dir default-directory
+	    :build-dir default-directory
+	    :macros ""
+	    :targets ""
+	    :makefile "Makefile"
 	    ;; :prefix current-prefix-arg
 	    ))
     ))
@@ -1504,17 +1570,18 @@ the ancillary window."
   (let ((src-dir-widget nil)
 	(bin-dir-widget nil)
 	(install-dir-widget nil)
-	(cmd-widget nil))
-    (cl-flet (
-	      ;; (modify-cmd-widget (cmd)
-	      ;;   (widget-value-set cmd-widget cmd))
-	      (modify-cmd-widget ()
+	(cmd-widget nil)
+	(makefile-widget nil)
+	)
+    
+    (cl-flet ((modify-cmd-widget ()
 		(save-excursion
 		  (let* ((build-system emc::build-system-chosen)
 			 (cmd emc::command-chosen)
 			 (src-dir (widget-value src-dir-widget))
 			 (bin-dir (widget-value bin-dir-widget))
 			 (install-dir (widget-value install-dir-widget))
+			 (makefile (widget-value makefile-widget))
 			 (cmdline
 			  (emc:craft-command system-type
 					     build-system
@@ -1522,6 +1589,7 @@ the ancillary window."
 					     :source-dir src-dir
 					     :build-dir bin-dir
 					     :install-dir install-dir
+					     :makefile makefile
 					     ))
 			 )
 
@@ -1531,7 +1599,32 @@ the ancillary window."
 			     bin-dir
 			     cmdline)
 		    (widget-value-set cmd-widget cmdline)
-		    )))
+		    )))			; modify-cmd-widget
+
+	      (run-cmd ()
+		(let* ((build-system emc::build-system-chosen)
+		       (cmd emc::command-chosen)
+		       (src-dir (widget-value src-dir-widget))
+		       (bin-dir (widget-value bin-dir-widget))
+		       (install-dir (widget-value install-dir-widget))
+		       (makefile-name (widget-value makefile-widget))
+		       )
+
+		    (message "EMC: running %s" build-system)
+		    (message "EMC: command %s" cmd)
+		    (message "EMC: source dir  : %s" src-dir)
+		    (message "EMC: build dir   : %s" bin-dir)
+		    (message "EMC: install dir : %s" install-dir)
+		    (emc:run cmd
+			     :build-system build-system
+			     :source-dir src-dir
+			     :build-dir src-dir
+			     :install-dir src-dir
+			     ;; :macros ""
+			     ;; :targets ""
+			     :makefile makefile-name
+			     )
+		    ))			; run-cmd
 	      )
 
       ;; (widget-insert "Emacs Make Compile (EMC, or Emacs Master of Cerimonies)")
@@ -1560,7 +1653,21 @@ the ancillary window."
 
       (widget-insert "\n")
 
+      (setq makefile-widget
+	    (widget-create 'string
+			   :value "Makefile"
+			   :format "Makefile    : %v"
+			   :size 40
+			   :notify (lambda (w &rest ignore)
+				     (ignore w ignore)
+				     (save-excursion
+				       (modify-cmd-widget ; (widget-value w)
+					)))
+			   :help-echo "The 'makefile' name."
+			   ))
 
+      (widget-insert "\n\n")
+      
       (setq src-dir-widget
 	    (widget-create 'directory
 			   :value default-directory
@@ -1669,34 +1776,38 @@ the ancillary window."
       (widget-create 'push-button :value "Run"
 		     :notify (lambda (w &rest args)
 			       (ignore w args)
-			       
+			       (message "EMC: running %S"
+					(widget-value cmd-widget))
+			       (run-cmd)
 			       ))
       (widget-insert "     ")
       (widget-create 'push-button
-		     :value "Cancel"
+		     :value "Cancel/Close"
 		     :notify (lambda (w &rest args)
 			       (ignore w args)
 			       (emc::exit-panel))
 		     )
-      (widget-insert "     ")
-      (widget-create 'push-button
-		     :value "Mess src dir"
-		     :notify (lambda (w &rest args)
-			       (ignore w args)
-			       (message "Widget %s"
-					(widget-get src-dir-widget :widget))
-			       (widget-browse src-dir-widget)
-			       (widget-delete src-dir-widget)
-			       )
-		     )
-      (widget-insert "     ")
-      (widget-create 'push-button
-		     :value "Redo src dir"
-		     :notify (lambda (w &rest args)
-			       (ignore w args)
-			       ;; (widget-insert src-dir-widget)
-			       )
-		     )
+      
+      ;; (widget-insert "     ")
+      ;; (widget-create 'push-button
+      ;; 		     :value "Mess src dir"
+      ;; 		     :notify (lambda (w &rest args)
+      ;; 			       (ignore w args)
+      ;; 			       (message "Widget %s"
+      ;; 					(widget-get src-dir-widget :widget))
+      ;; 			       (widget-browse src-dir-widget)
+      ;; 			       (widget-delete src-dir-widget)
+      ;; 			       )
+      ;; 		     )
+      ;; (widget-insert "     ")
+      ;; (widget-create 'push-button
+      ;; 		     :value "Redo src dir"
+      ;; 		     :notify (lambda (w &rest args)
+      ;; 			       (ignore w args)
+      ;; 			       ;; (widget-insert src-dir-widget)
+      ;; 			       )
+      ;; 		     )
+
       (widget-insert "\n")
 
       (prog1 (widget-setup)
@@ -1705,7 +1816,7 @@ the ancillary window."
       )))
 
 
-(defun emc::exit-panel () 
+(defun emc::exit-panel ()
   "Exit the EMC panel (and buffer)."
 
   (interactive)
