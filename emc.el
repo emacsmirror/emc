@@ -1311,9 +1311,9 @@ and BUILD-DIR are as per `emc:make'."
 
 
 
-;; emc::read-build-parms-minibuffer
+;; emc::read-command-minibuffer
 
-(defun emc::read-build-parms-minibuffer (&optional prefix-argument)
+(defun emc::read-command-minibuffer (&optional prefix-argument)
   "Read the common build system parameters from minibuffer.
 
 PREFIX-ARGUMENT is possibly bound to PREFIX-ARG."
@@ -1330,6 +1330,8 @@ PREFIX-ARGUMENT is possibly bound to PREFIX-ARG."
 			   ("clean" ?c "clean the project")
 			   ))))
 	  )
+	 (parms
+	  (emc::read-command-parms-minibuffer prefix-argument))
 	 )
     
     (when emc:*verbose*
@@ -1337,49 +1339,7 @@ PREFIX-ARGUMENT is possibly bound to PREFIX-ARG."
 	       prefix-arg
 	       prefix-argument))
     
-    (if prefix-argument
-	(let* ((build-system
-		(read-answer "Build with: "
-			     '(("make" ?m "use 'make'.")
-			       ("cmake" ?c "use 'cmake'.")
-			       ))
-		)
-	       (makefile
-		(when (string-equal build-system "make")
-		  (read-from-minibuffer "Makefile: "
-					nil nil nil nil "Makefile")))
-	       (source-dir
-		(expand-file-name
-		 (read-directory-name "Source directory: ")))
-	       (build-dir
-		(expand-file-name
-		 (read-directory-name "Build directory: ")))
-	       (macros
-		(read-from-minibuffer "Macros: " nil nil nil nil ""))
-	       (targets
-		(read-from-minibuffer "Targets: " nil nil nil nil ""))
-	       )
-	  (list cmd
-		:build-system (car (read-from-string build-system))
-		:source-dir source-dir
-		:build-dir build-dir
-		:macros macros
-		:targets targets
-		:makefile makefile
-		;; :prefix current-prefix-arg
-		))
-      
-      ;; Default is no prefix arg was given.
-      
-      (list cmd
-	    :build-system 'make
-	    :source-dir default-directory
-	    :build-dir default-directory
-	    :macros ""
-	    :targets ""
-	    :makefile "Makefile"
-	    ;; :prefix current-prefix-arg
-	    ))
+    (cl-list* cmd parms)
     ))
 
 
@@ -1389,13 +1349,8 @@ PREFIX-ARGUMENT is possibly bound to PREFIX-ARG."
   "Read the common command parameters from minibuffer.
 
 PREFIX-ARGUMENT is possibly bound to PREFIX-ARG."
-  (let ((read-answer-short nil)	; Force long answers.
+  (let ((read-answer-short nil)		; Force long answers.
 	)
-    
-    (when emc:*verbose*
-      (message "EMC: read build parms from minibuffer (%S %S)."
-	       prefix-arg
-	       prefix-argument))
     
     (if prefix-argument
 	(let* ((build-system
@@ -1414,6 +1369,9 @@ PREFIX-ARGUMENT is possibly bound to PREFIX-ARG."
 	       (build-dir
 		(expand-file-name
 		 (read-directory-name "Build directory: ")))
+	       (install-dir
+		(expand-file-name
+		 (read-directory-name "Install directory: ")))
 	       (macros
 		(read-from-minibuffer "Macros: " nil nil nil nil ""))
 	       (targets
@@ -1422,6 +1380,7 @@ PREFIX-ARGUMENT is possibly bound to PREFIX-ARG."
 	  (list :build-system (car (read-from-string build-system))
 		:source-dir source-dir
 		:build-dir build-dir
+		:install-dir install-dir
 		:macros macros
 		:targets targets
 		:makefile makefile
@@ -1433,6 +1392,7 @@ PREFIX-ARGUMENT is possibly bound to PREFIX-ARG."
       (list :build-system 'make
 	    :source-dir default-directory
 	    :build-dir default-directory
+	    :install-dir default-directory
 	    :macros ""
 	    :targets ""
 	    :makefile "Makefile"
@@ -1467,7 +1427,7 @@ to \\='make\\=' and \\='cmake\\='.  Finally, KEYS, collects all the
 keyword parameters passed as arguments to `emc:run'.  VERBOSE controls
 whether EMC prints out progress messages."
   
-  (interactive (emc::read-build-parms-minibuffer current-prefix-arg))
+  (interactive (emc::read-command-minibuffer current-prefix-arg))
 
   (ignore build-system source-dir build-dir install-dir macros targets)
   
@@ -1572,6 +1532,7 @@ the ancillary window."
 	(install-dir-widget nil)
 	(cmd-widget nil)
 	(makefile-widget nil)
+	(targets-widget nil)
 	)
     
     (cl-flet ((modify-cmd-widget ()
@@ -1582,6 +1543,7 @@ the ancillary window."
 			 (bin-dir (widget-value bin-dir-widget))
 			 (install-dir (widget-value install-dir-widget))
 			 (makefile (widget-value makefile-widget))
+			 (targets (widget-value targets-widget))
 			 (cmdline
 			  (emc:craft-command system-type
 					     build-system
@@ -1590,6 +1552,7 @@ the ancillary window."
 					     :build-dir bin-dir
 					     :install-dir install-dir
 					     :makefile makefile
+					     :targets targets
 					     ))
 			 )
 
@@ -1608,6 +1571,7 @@ the ancillary window."
 		       (bin-dir (widget-value bin-dir-widget))
 		       (install-dir (widget-value install-dir-widget))
 		       (makefile-name (widget-value makefile-widget))
+		       (targets (widget-value targets-widget))
 		       )
 
 		    (message "EMC: running %s" build-system)
@@ -1623,6 +1587,7 @@ the ancillary window."
 			     ;; :macros ""
 			     ;; :targets ""
 			     :makefile makefile-name
+			     :targets targets
 			     )
 		    ))			; run-cmd
 	      )
@@ -1764,7 +1729,20 @@ the ancillary window."
 				   )
 		     )
       
-  
+      (widget-insert "\n")
+      (setq targets-widget
+	    (widget-create 'string
+			   :value ""
+			   :format "(Extra) targets : %v"
+			   :size 40
+			   :notify (lambda (w &rest ignore)
+				     (ignore w ignore)
+				     (save-excursion
+				       (modify-cmd-widget ; (widget-value w)
+					)))
+			   ))
+
+      
       (widget-insert "\n")
       ;; (widget-create 'group :tag "Actual command")
       (widget-insert "Actual command:")
