@@ -12,7 +12,7 @@
 ;; Summary: Invoking a C/C++ (and other) build toolchain from Emacs.
 ;;
 ;; Created: 2025-01-02
-;; Version: 2025-05-05
+;; Version: 2025-05-06
 ;;
 ;; Keywords: languages, operating systems, binary platform.
 
@@ -115,7 +115,6 @@
 ;;
 
 
-
 ;;; Code:
 
 (require 'cl-lib)
@@ -197,6 +196,195 @@ toolchains."
   :type 'symbol
   :options '(make cmake)
   )
+
+
+;; Generic API exported functions.
+;; -------------------------------
+;;
+;; I reuse the 'compile.el' machinery.
+
+(defcustom emc:*max-line-length* 72
+  "The maximum compilation line length used by `compile'.
+
+See Also:
+
+`compilation-max-output-line-length'"
+  :group 'emc
+  :type 'natnum
+  )
+
+
+(defcustom emc:*verbose* nil
+  "If non NIL show messages about EMC progress."
+  :group 'emc
+  :type 'sexp
+  )
+
+
+(defun emc::platform-type ()
+  "Return the current \\='platform-type\\='.
+
+The possible values are \\='darwin\\=' (for Mac OS),
+\\='windows-nt\\=', \\='unix\\=', or NIL for an unusable (for the time
+being) platoform type.
+
+See Also:
+
+`system-type'."
+  (cl-case system-type
+    (darwin
+     'darwin)
+    (windows-nt
+     'windows-nt)
+    ((gnu
+      gnu/linux
+      gnu/kfreebsd
+      cygwin
+
+      ;; Old, Emacs 26 specs: see `system-type'.
+      aix
+      berkeley-unix
+      hpux
+      usg-unix-v)
+     'generic-unix)
+    (otherwise
+     nil)))
+
+
+;; Support for special `interactive' calls.
+;; ----------------------------------------
+;;
+;; Note the trick of passing 'keywords' that must
+;; interactively "read"; unfortunately the keyword plist must be
+;; manually reconstructed within the `interactive' call.
+;;
+;; Bottom line: `interactive' and `cl-defun' mix well only in simple
+;; cases.
+
+;; emc::read-command-minibuffer
+
+(cl-defun emc::read-command-minibuffer (&optional prefix-argument
+						  (parms-to-be-read ())
+						  defaults)
+  "Read the common build system parameters from minibuffer.
+
+PREFIX-ARGUMENT is possibly bound to PREFIX-ARG.  PARMS-TO-BE-READ
+contains a list of standard-parameters to be read interactively; if
+empty (i.e., NIL) all parameters are read interactively.  DEFAULTS is
+a keyword p-list (passed down from \\='&rest keys\\=' parameters by
+callers."
+  (let* ((read-answer-short nil)	; Force long answers.
+	 (cmd
+	  (car
+	   (read-from-string
+	    (read-answer "Command: "
+			 '(("setup" ?s "setup the project")
+			   ("build" ?b "build the project")
+			   ("install" ?i "install the project")
+			   ("uninstall" ?u "uninstall the project")
+			   ("fresh" ?f "freshen the project")
+			   ("clean" ?c "clean the project")
+			   ))))
+	  )
+	 (parms
+	  (emc::read-command-parms-minibuffer prefix-argument
+					      parms-to-be-read
+					      defaults))
+	 )
+    
+    (when emc:*verbose*
+      (message "EMC: read build parms from minibuffer (%S %S)."
+	       prefix-arg
+	       prefix-argument))
+    
+    (cl-list* cmd parms)
+    ))
+
+
+;; emc::read-command-parms-minibuffer
+
+(cl-defun emc::read-command-parms-minibuffer (&optional prefix-argument
+							(parms-to-be-read ())
+							defaults)
+  "Read the common command parameters from minibuffer.
+
+PREFIX-ARGUMENT is possibly bound to PREFIX-ARG.  PARMS-TO-BE-READ
+contains a list of standard-parameters to be read interactively; if
+empty (i.e., NIL) all parameters are read interactively.  DEFAULTS is
+a keyword p-list (passed down from \\='&rest keys\\=' parameters by
+callers."
+  (let ((read-answer-short nil)		; Force long answers.
+	)
+    (cl-macrolet ((read-parm (parm &body reader)
+		    `(if (or (null parms-to-be-read)
+			     (memq ',parm parms-to-be-read))
+			 ,@reader
+		       (cl-getf defaults ',parm)
+		       ))
+		  )
+    
+      (if prefix-argument
+	  (let* ((build-system
+		  (read-parm :build-system
+			     (intern
+			      (read-answer "Build with: "
+					   '(("make" ?m "use 'make'.")
+					     ("cmake" ?c "use 'cmake'.")
+					     ))))
+		  )
+		 (makefile
+		  (read-parm :makefile
+			     (when (string-equal build-system "make")
+			       (read-from-minibuffer
+				"Makefile: "
+				"Makefile"))))
+		 (source-dir
+		  (read-parm :source-dir
+			     (expand-file-name
+			      (read-directory-name
+			       "Source directory: "))))
+		 (build-dir
+		  (read-parm :build-dir
+			     (expand-file-name
+			      (read-directory-name
+			       "Build directory: "))))
+		 (install-dir
+		  (read-parm :install-dir
+			     (expand-file-name
+			      (read-directory-name
+			       "Install directory: "))))
+		 (macros
+		  (read-parm :make-macros
+			     (read-from-minibuffer
+			      "Macros: " nil nil nil nil "")))
+		 (targets
+		  (read-parm :targets
+			     (read-from-minibuffer
+			      "Targets: " nil nil nil nil "")))
+		 )
+	    (append (and build-system (list :build-system build-system))
+		    (and source-dir (list :source-dir source-dir))
+		    (and build-dir (list :build-dir build-dir))
+		    (and install-dir (list :install-dir install-dir))
+		    (and macros (list :make-macros macros))
+		    (and targets (list :targets targets))
+		    (and makefile (list :makefile makefile))
+		    ;; (and current-prefix-arg (list :prefix current-prefix-arg))
+		    ))
+      
+	;; Default is no prefix arg was given.
+      
+	(list :build-system emc:*default-build-system*
+	      :source-dir default-directory
+	      :build-dir default-directory
+	      :install-dir default-directory
+	      :make-macros ""
+	      :targets ""
+	      :makefile "Makefile"
+	      ;; :prefix current-prefix-arg
+	      ))
+      )					; macrolet
+    ))
 
 
 ;;; cmake common definitions.
@@ -420,8 +608,10 @@ folder where \\='make\\=' will be invoked.  DRY-RUN runs the
 
   (concat (if bd-p (concat "cd " build-dir " ; ") "")
 	  "make "
-          (when makefile-p (format "-f %s " (shell-quote-argument makefile)))
-          (when make-macros-p (concat (shell-quote-argument make-macros) " "))
+          (when (and makefile-p (not (string-empty-p makefile)))
+	    (format "-f %s " (shell-quote-argument makefile)))
+          (when (and make-macros-p (not (string-empty-p make-macros)))
+	    (concat (shell-quote-argument make-macros) " "))
 	  (when dry-run "-n ")
           targets)
   )
@@ -510,59 +700,6 @@ Notes:
 This is just a wrapper for `emc:unix-cmake-cmd'."
   (apply #'emc:unix-cmake-cmd keys)
   )
-
-
-;; Generic API exported functions.
-;; -------------------------------
-;;
-;; I reuse the 'compile.el' machinery.
-
-(defcustom emc:*max-line-length* 72
-  "The maximum compilation line length used by `compile'.
-
-See Also:
-
-`compilation-max-output-line-length'"
-  :group 'emc
-  :type 'natnum
-  )
-
-
-(defcustom emc:*verbose* nil
-  "If non NIL show messages about EMC progress."
-  :group 'emc
-  :type 'sexp
-  )
-
-
-(defun emc::platform-type ()
-  "Return the current \\='platform-type\\='.
-
-The possible values are \\='darwin\\=' (for Mac OS),
-\\='windows-nt\\=', \\='unix\\=', or NIL for an unusable (for the time
-being) platoform type.
-
-See Also:
-
-`system-type'."
-  (cl-case system-type
-    (darwin
-     'darwin)
-    (windows-nt
-     'windows-nt)
-    ((gnu
-      gnu/linux
-      gnu/kfreebsd
-      cygwin
-
-      ;; Old, Emacs 26 specs: see `system-type'.
-      aix
-      berkeley-unix
-      hpux
-      usg-unix-v)
-     'generic-unix)
-    (otherwise
-     nil)))
 
 
 ;; emc::commands
@@ -717,8 +854,11 @@ progress messages."
                           (targets "")
 			  (dry-run nil)
 			  (wait nil)
-			  (build-system 'make)
+			  (build-system emc:*default-build-system*)
 			  (build-dir default-directory)
+			  (source-dir default-directory)
+			  (install-dir default-directory)
+			  
                           &allow-other-keys)
   "Call a \\='make\\=' program in a platform dependend way.
 
@@ -736,7 +876,26 @@ working).  BUILD-DIR is the directory (folder) where the build
 system will be invoked. DRY-RUN runs the \\='cmake\\=' command without
 executing it."
 
-  (ignore dry-run)
+  (interactive
+   (emc::read-command-parms-minibuffer current-prefix-arg
+				       '(:makefile
+					 :source-dir
+					 :build-dir
+					 :install-dir
+					 :make-macros
+					 :dry-run
+					 :targets)
+				       (list :makefile "Makefile"
+					     :make-macros ""
+					     :targets ""
+					     :build-system 'cmake
+					     :build-dir default-directory
+					     :source-dir default-directory
+					     :install-dir default-directory
+					     :dry-run nil
+					     )))
+
+  (ignore dry-run source-dir install-dir)
   
   ;; Some preventive basic error checking.
   
@@ -945,6 +1104,7 @@ BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
 			 (wait nil)
 			 (source-dir default-directory)
 			 (build-dir default-directory)
+			 (install-dir default-directory)
                          &allow-other-keys)
   "Call \\='cmake\\=' in a platform dependend way.
 
@@ -959,6 +1119,22 @@ project resides, while BUILD-DIR is the directory (folder) where the
 build system will be invoked.  DRY-RUN runs the \\='cmake\\=' command
 without executing it."
 
+  (interactive
+   (emc::read-command-minibuffer current-prefix-arg
+				 '(:source-dir
+				   :build-dir
+				   :install-dir
+				   :make-macros
+				   :dry-run
+				   :targets)
+				 (list :make-macros ""
+				       :targets ""
+				       :build-system 'cmake
+				       :build-dir default-directory
+				       :source-dir default-directory
+				       :install-dir default-directory
+				       :dry-run nil
+				       )))
   (ignore dry-run)
   
   ;; Some preventive basic error checking.
@@ -967,12 +1143,15 @@ without executing it."
     (error "EMC: error: non-existing source directory %S" source-dir))
   (unless (file-exists-p build-dir)
     (error "EMC: error: non-existing build directory %S" build-dir))
+  (unless (file-exists-p install-dir)
+    (error "EMC: error: non-existing install directory %S" build-dir))
 
   ;; Here we go.
 
   (message "EMC: running 'cmake' command %S" cmd)
   (message "EMC: source-dir:  %S" source-dir)
   (message "EMC: build-dir:   %S" build-dir)
+  (message "EMC: install-dir: %S" install-dir)
   (message "EMC: make-macros: %S" make-macros)
   (message "EMC: targets:     %S" targets)
   (message "EMC: making...")
@@ -1117,6 +1296,12 @@ BUILD-SYSTEM equal to \\=':cmake\\=' is invoked with KEYS."
 
 
 ;; Commands
+;; The following are functions that have the `interactive' feature.
+;; Some useful extra functions are also provided (the `emc::read-*'
+;; functions).
+
+
+;; emc:setup
 
 (cl-defun emc:setup (&rest keys
                            &key
@@ -1124,7 +1309,7 @@ BUILD-SYSTEM equal to \\=':cmake\\=' is invoked with KEYS."
                            (make-macros "")
                            (targets "")
 			   (wait nil)
-			   (build-system 'make)
+			   (build-system emc:*default-build-system*)
 			   (build-dir default-directory)
                            &allow-other-keys)
   "EMC Build command.
@@ -1136,9 +1321,24 @@ relevant function.
 The variables KEYS, MAKEFILE, MAKE-MACROS, WAIT, TARGETS, BUILD-SYSTEM
 and BUILD-DIR are as per `emc:make'."
 
+  (interactive
+   (emc::read-command-minibuffer current-prefix-arg
+				 '(:build-system
+				   :makefile
+				   :source-dir
+				   :build-dir
+				   :make-macros
+				   :targets)
+				 (list :makefile "Makefile"
+				       :make-macros ""
+				       :targets ""
+				       :build-system emc:*default-build-system*
+				       :build-dir default-directory
+				       )))
+  
   (ignore makefile make-macros targets wait build-dir)
 
-  (cl-case build-system
+  (cl-case (emc::normalize-build-system build-system)
     ((make :make) t)
     ((cmake :cmake) (apply #'emc:cmake :setup keys))
     (t
@@ -1152,7 +1352,7 @@ and BUILD-DIR are as per `emc:make'."
                            (make-macros "")
                            (targets "")
 			   (wait nil)
-			   (build-system 'make)
+			   (build-system emc:*default-build-system*)
 			   (build-dir default-directory)
                            &allow-other-keys)
   "EMC Build command.
@@ -1164,9 +1364,24 @@ relevant function.
 The variables KEYS, MAKEFILE, MAKE-MACROS, WAIT, TARGETS, BUILD-SYSTEM
 and BUILD-DIR are as per `emc:make'."
 
+  (interactive
+   (emc::read-command-minibuffer current-prefix-arg
+				 '(:build-system
+				   :makefile
+				   :source-dir
+				   :build-dir
+				   :macros
+				   :targets)
+				 (list :makefile "Makefile"
+				       :make-macros ""
+				       :targets ""
+				       :build-system emc:*default-build-system*
+				       :build-dir default-directory
+				       )))
+  
   (ignore makefile make-macros targets wait build-dir)
 
-  (cl-case build-system
+  (cl-case (emc::normalize-build-system build-system)
     ((make :make) (apply #'emc:make keys))
     ((cmake :cmake) (apply #'emc:cmake :build keys))
     (t
@@ -1181,7 +1396,7 @@ and BUILD-DIR are as per `emc:make'."
                              (targets "install")
 			     (wait nil)
 			     (build-system :make)
-			     (build-dir default-directory)
+			     (install-dir default-directory)
                              &allow-other-keys)
   "EMC Install command.
 
@@ -1192,9 +1407,22 @@ relevant function.
 The variables KEYS, MAKEFILE, MAKE-MACROS, WAIT, TARGETS, BUILD-SYSTEM
 and BUILD-DIR are as per `emc:make'."
 
-  (ignore makefile make-macros targets wait build-dir)
+  (interactive
+   (emc::read-command-minibuffer current-prefix-arg
+				 '(:build-system
+				   :makefile
+				   :install-dir
+				   )
+				 (list :makefile "Makefile"
+				       :make-macros ""
+				       :targets "install"
+				       :build-system emc:*default-build-system*
+				       :install-dir default-directory
+				       )))
+  
+  (ignore makefile make-macros targets wait install-dir)
 
-  (cl-case build-system
+  (cl-case (emc::normalize-build-system build-system)
     ((:make make)
      (let ((targets (if (string-equal-ignore-case "install" targets)
 			targets
@@ -1214,8 +1442,8 @@ and BUILD-DIR are as per `emc:make'."
                                (make-macros "")
                                (targets "uninstall")
 			       (wait nil)
-			       (build-system 'make)
-			       (build-dir default-directory)
+			       (build-system emc:*default-build-system*)
+			       (install-dir default-directory)
                                &allow-other-keys)
   "EMC Uninstall command.
 
@@ -1226,9 +1454,21 @@ relevant function.
 The variables KEYS, MAKEFILE, MAKE-MACROS, WAIT, TARGETS, BUILD-SYSTEM
 and BUILD-DIR are as per `emc:make'."
 
-  (ignore makefile make-macros targets wait build-dir)
+  (interactive
+   (emc::read-command-minibuffer current-prefix-arg
+				 '(:build-system
+				   :makefile
+				   :install-dir
+				   )
+				 (list :makefile "Makefile"
+				       :make-macros ""
+				       :targets "uninstall"
+				       :build-system emc:*default-build-system*
+				       :install-dir default-directory
+				       )))
+  (ignore makefile make-macros targets wait install-dir)
 
-  (cl-case build-system
+  (cl-case (emc::normalize-build-system build-system)
     ((make :make)
      (let ((targets (if (string-equal-ignore-case "uninstall" targets)
 			targets
@@ -1249,7 +1489,7 @@ and BUILD-DIR are as per `emc:make'."
                            (make-macros "")
                            (targets "clean")
 			   (wait nil)
-			   (build-system 'make)
+			   (build-system emc:*default-build-system*)
 			   (build-dir default-directory)
                            &allow-other-keys)
   "EMC Clean command.
@@ -1261,9 +1501,21 @@ relevant function.
 The variables KEYS, MAKEFILE, MAKE-MACROS, WAIT, TARGETS, BUILD-SYSTEM
 and BUILD-DIR are as per `emc:make'."
 
+  (interactive
+   (emc::read-command-parms-minibuffer current-prefix-arg
+				       '(:build-system
+					 :makefile
+					 )
+				       (list :makefile "Makefile"
+					     :make-macros ""
+					     :targets "clean"
+					     :build-system emc:*default-build-system*
+					     :build-dir default-directory
+					     )))
+    
   (ignore makefile make-macros targets wait build-dir)
 
-  (cl-case build-system
+  (cl-case (emc::normalize-build-system build-system)
     ((make :make)
      (let ((targets (if (string-equal-ignore-case "clean" targets)
 			targets
@@ -1282,7 +1534,7 @@ and BUILD-DIR are as per `emc:make'."
                            (make-macros "")
                            (targets "clean")
 			   (wait nil)
-			   (build-system 'make)
+			   (build-system emc:*default-build-system*)
 			   (build-dir default-directory)
                            &allow-other-keys)
   "EMC Fresh command.
@@ -1294,9 +1546,24 @@ relevant function.
 The variables KEYS, MAKEFILE, MAKE-MACROS, WAIT, TARGETS, BUILD-SYSTEM
 and BUILD-DIR are as per `emc:make'."
 
+  (interactive
+   (emc::read-command-minibuffer current-prefix-arg
+				 '(:build-system
+				   :makefile
+				   :source-dir
+				   :build-dir
+				   :make-macros
+				   :targets)
+				 (list :makefile "Makefile"
+				       :make-macros ""
+				       :targets "clean"
+				       :build-system emc:*default-build-system*
+				       :build-dir default-directory
+				       )))
+  
   (ignore makefile make-macros targets wait build-dir)
 
-  (cl-case build-system
+  (cl-case (emc::normalize-build-system build-system)
     ((make :make)
      (let ((targets (if (string-equal-ignore-case "fresh" targets)
 			targets
@@ -1310,108 +1577,17 @@ and BUILD-DIR are as per `emc:make'."
     ))
 
 
-
-;; emc::read-command-minibuffer
-
-(defun emc::read-command-minibuffer (&optional prefix-argument)
-  "Read the common build system parameters from minibuffer.
-
-PREFIX-ARGUMENT is possibly bound to PREFIX-ARG."
-  (let* ((read-answer-short nil)	; Force long answers.
-	 (cmd
-	  (car
-	   (read-from-string
-	    (read-answer "Command: "
-			 '(("setup" ?s "setup the project")
-			   ("build" ?b "build the project")
-			   ("install" ?i "install the project")
-			   ("uninstall" ?u "uninstall the project")
-			   ("fresh" ?f "freshen the project")
-			   ("clean" ?c "clean the project")
-			   ))))
-	  )
-	 (parms
-	  (emc::read-command-parms-minibuffer prefix-argument))
-	 )
-    
-    (when emc:*verbose*
-      (message "EMC: read build parms from minibuffer (%S %S)."
-	       prefix-arg
-	       prefix-argument))
-    
-    (cl-list* cmd parms)
-    ))
-
-
-;; emc::read-command-parms-minibuffer
-
-(defun emc::read-command-parms-minibuffer (&optional prefix-argument)
-  "Read the common command parameters from minibuffer.
-
-PREFIX-ARGUMENT is possibly bound to PREFIX-ARG."
-  (let ((read-answer-short nil)		; Force long answers.
-	)
-    
-    (if prefix-argument
-	(let* ((build-system
-		(read-answer "Build with: "
-			     '(("make" ?m "use 'make'.")
-			       ("cmake" ?c "use 'cmake'.")
-			       ))
-		)
-	       (makefile
-		(when (string-equal build-system "make")
-		  (read-from-minibuffer "Makefile: "
-					nil nil nil nil "Makefile")))
-	       (source-dir
-		(expand-file-name
-		 (read-directory-name "Source directory: ")))
-	       (build-dir
-		(expand-file-name
-		 (read-directory-name "Build directory: ")))
-	       (install-dir
-		(expand-file-name
-		 (read-directory-name "Install directory: ")))
-	       (macros
-		(read-from-minibuffer "Macros: " nil nil nil nil ""))
-	       (targets
-		(read-from-minibuffer "Targets: " nil nil nil nil ""))
-	       )
-	  (list :build-system (car (read-from-string build-system))
-		:source-dir source-dir
-		:build-dir build-dir
-		:install-dir install-dir
-		:macros macros
-		:targets targets
-		:makefile makefile
-		;; :prefix current-prefix-arg
-		))
-      
-      ;; Default is no prefix arg was given.
-      
-      (list :build-system 'make
-	    :source-dir default-directory
-	    :build-dir default-directory
-	    :install-dir default-directory
-	    :macros ""
-	    :targets ""
-	    :makefile "Makefile"
-	    ;; :prefix current-prefix-arg
-	    ))
-    ))
-
-
 ;; emc:run
 ;; The most general entry point.
 
 (cl-defun emc:run (cmd &rest keys
 		       &key
 		       ;; (prefix 42)
-		       (build-system 'make)
+		       (build-system emc:*default-build-system*)
 		       (source-dir default-directory)
 		       (build-dir default-directory)
 		       (install-dir default-directory)
-		       (macros "")
+		       (make-macros "")
 		       (targets "")
 		       (verbose emc:*verbose*)
 		       &allow-other-keys)
@@ -1427,9 +1603,25 @@ to \\='make\\=' and \\='cmake\\='.  Finally, KEYS, collects all the
 keyword parameters passed as arguments to `emc:run'.  VERBOSE controls
 whether EMC prints out progress messages."
   
-  (interactive (emc::read-command-minibuffer current-prefix-arg))
+  (interactive
+   (emc::read-command-minibuffer current-prefix-arg
+				 '(:build-system
+				   :makefile
+				   :source-dir
+				   :build-dir
+				   :install-dir
+				   :make-macros
+				   :targets)
+				 (list :makefile "Makefile"
+				       :make-macros ""
+				       :targets "clean"
+				       :build-system emc:*default-build-system*
+				       :source-dir default-directory
+				       :build-dir default-directory
+				       :install-dir default-directory
+				       )))
 
-  (ignore build-system source-dir build-dir install-dir macros targets)
+  (ignore build-system source-dir build-dir install-dir make-macros targets)
   
   (message "EMC: %s %S" cmd keys)
 
@@ -1446,8 +1638,10 @@ whether EMC prints out progress messages."
 
 
 ;; EMC panel.
+;; ----------
 ;;
-;; In for an arm, in for a leg.
+;; In for an arm, in for a leg.  Let's also have an Emacs Wideget user
+;; interface.
 
 (require 'widget)
 (require 'wid-edit)
@@ -1524,7 +1718,7 @@ the ancillary window."
 	   (eql (current-local-map) (current-global-map)))
 
   (setq-local emc::from-buffer from-buffer)
-  (setq-local emc::build-system-chosen 'make)
+  (setq-local emc::build-system-chosen emc:*default-build-system*)
   (setq-local emc::command-chosen 'build)
 
   (let ((src-dir-widget nil)
@@ -1533,6 +1727,7 @@ the ancillary window."
 	(cmd-widget nil)
 	(makefile-widget nil)
 	(targets-widget nil)
+	(make-macros-widget nil)
 	)
     
     (cl-flet ((modify-cmd-widget ()
@@ -1544,6 +1739,8 @@ the ancillary window."
 			 (install-dir (widget-value install-dir-widget))
 			 (makefile (widget-value makefile-widget))
 			 (targets (widget-value targets-widget))
+			 (macros (widget-value make-macros-widget))
+			 
 			 (cmdline
 			  (emc:craft-command system-type
 					     build-system
@@ -1553,6 +1750,7 @@ the ancillary window."
 					     :install-dir install-dir
 					     :makefile makefile
 					     :targets targets
+					     :make-macros macros
 					     ))
 			 )
 
@@ -1572,6 +1770,7 @@ the ancillary window."
 		       (install-dir (widget-value install-dir-widget))
 		       (makefile-name (widget-value makefile-widget))
 		       (targets (widget-value targets-widget))
+		       (macros (widget-value make-macros-widget))
 		       )
 
 		    (message "EMC: running %s" build-system)
@@ -1582,10 +1781,9 @@ the ancillary window."
 		    (emc:run cmd
 			     :build-system build-system
 			     :source-dir src-dir
-			     :build-dir src-dir
-			     :install-dir src-dir
-			     ;; :macros ""
-			     ;; :targets ""
+			     :build-dir bin-dir
+			     :install-dir install-dir
+			     :make-macros macros
 			     :makefile makefile-name
 			     :targets targets
 			     )
@@ -1728,6 +1926,19 @@ the ancillary window."
 					   "'make' it may generate an error.")
 				   )
 		     )
+
+      (widget-insert "\n")
+      (setq make-macros-widget
+	    (widget-create 'string
+			   :value ""
+			   :format "Macros : %v"
+			   :size 40
+			   :notify (lambda (w &rest ignore)
+				     (ignore w ignore)
+				     (save-excursion
+				       (modify-cmd-widget ; (widget-value w)
+					)))
+			   ))
       
       (widget-insert "\n")
       (setq targets-widget
