@@ -979,9 +979,9 @@ BUILD-SYSTEM equal to \\='make\\=' is invoked with KEYS."
   (ignore sys build-system)
   (let ((tgts (emc::craft-make-targets command targets)))
     
-    (message "EMC: craft-command: MSVC nmake: %S %S" command tgts)
+    ;; (message "EMC: craft-command: MSVC nmake: %S %S" command tgts)
     (cl-remf keys :targets)
-    (message "EMC: craft-command: %S" keys)
+    ;; (message "EMC: craft-command: %S" keys)
     (apply #'emc:msvc-make-cmd :targets tgts keys)
     ))
 
@@ -1002,9 +1002,9 @@ BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
 
   (let ((tgts (emc::craft-make-targets command targets)))
     
-    (message "EMC: craft-command: MacOS make: %S %S" command tgts)
+    ;; (message "EMC: craft-command: MacOS make: %S %S" command tgts)
     (cl-remf keys :targets)
-    (message "EMC: craft-command: %S" keys)
+    ;; (message "EMC: craft-command: %S" keys)
     (apply #'emc:unix-make-cmd :targets tgts keys)
     ))
 
@@ -1027,9 +1027,9 @@ targets to pass down."
 
   (let ((tgts (emc::craft-make-targets command targets)))
 
-    (message "EMC: craft-command: UNX make: %S %S" command tgts)
+    ;; (message "EMC: craft-command: UNX make: %S %S" command tgts)
     (cl-remf keys :targets)
-    (message "EMC: craft-command: %S" keys)
+    ;; (message "EMC: craft-command: %S" keys)
     (apply #'emc:unix-make-cmd :targets tgts keys)
     ))
 
@@ -1365,19 +1365,20 @@ The variables KEYS, MAKEFILE, MAKE-MACROS, WAIT, TARGETS, BUILD-SYSTEM
 and BUILD-DIR are as per `emc:make'."
 
   (interactive
-   (emc::read-command-minibuffer current-prefix-arg
-				 '(:build-system
-				   :makefile
-				   :source-dir
-				   :build-dir
-				   :macros
-				   :targets)
-				 (list :makefile "Makefile"
-				       :make-macros ""
-				       :targets ""
-				       :build-system emc:*default-build-system*
-				       :build-dir default-directory
-				       )))
+   (emc::read-command-parms-minibuffer
+    current-prefix-arg
+    '(:build-system
+      :makefile
+      :source-dir
+      :build-dir
+      :make-macros
+      :targets)
+    (list :makefile "Makefile"
+	  :make-macros ""
+	  :targets ""
+	  :build-system emc:*default-build-system*
+	  :build-dir default-directory
+	  )))
   
   (ignore makefile make-macros targets wait build-dir)
 
@@ -1408,17 +1409,18 @@ The variables KEYS, MAKEFILE, MAKE-MACROS, WAIT, TARGETS, BUILD-SYSTEM
 and BUILD-DIR are as per `emc:make'."
 
   (interactive
-   (emc::read-command-minibuffer current-prefix-arg
-				 '(:build-system
-				   :makefile
-				   :install-dir
-				   )
-				 (list :makefile "Makefile"
-				       :make-macros ""
-				       :targets "install"
-				       :build-system emc:*default-build-system*
-				       :install-dir default-directory
-				       )))
+   (emc::read-command-parms-minibuffer
+    current-prefix-arg
+    '(:build-system
+      :makefile
+      :install-dir
+      )
+    (list :makefile "Makefile"
+	  :make-macros ""
+	  :targets "install"
+	  :build-system emc:*default-build-system*
+	  :install-dir default-directory
+	  )))
   
   (ignore makefile make-macros targets wait install-dir)
 
@@ -1455,17 +1457,18 @@ The variables KEYS, MAKEFILE, MAKE-MACROS, WAIT, TARGETS, BUILD-SYSTEM
 and BUILD-DIR are as per `emc:make'."
 
   (interactive
-   (emc::read-command-minibuffer current-prefix-arg
-				 '(:build-system
-				   :makefile
-				   :install-dir
-				   )
-				 (list :makefile "Makefile"
-				       :make-macros ""
-				       :targets "uninstall"
-				       :build-system emc:*default-build-system*
-				       :install-dir default-directory
-				       )))
+   (emc::read-command-parms-minibuffer
+    current-prefix-arg
+    '(:build-system
+      :makefile
+      :install-dir
+      )
+    (list :makefile "Makefile"
+	  :make-macros ""
+	  :targets "uninstall"
+	  :build-system emc:*default-build-system*
+	  :install-dir default-directory
+	  )))
   (ignore makefile make-macros targets wait install-dir)
 
   (cl-case (emc::normalize-build-system build-system)
@@ -1502,16 +1505,17 @@ The variables KEYS, MAKEFILE, MAKE-MACROS, WAIT, TARGETS, BUILD-SYSTEM
 and BUILD-DIR are as per `emc:make'."
 
   (interactive
-   (emc::read-command-parms-minibuffer current-prefix-arg
-				       '(:build-system
-					 :makefile
-					 )
-				       (list :makefile "Makefile"
-					     :make-macros ""
-					     :targets "clean"
-					     :build-system emc:*default-build-system*
-					     :build-dir default-directory
-					     )))
+   (emc::read-command-parms-minibuffer
+    current-prefix-arg
+    '(:build-system
+      :makefile
+      )
+    (list :makefile "Makefile"
+	  :make-macros ""
+	  :targets "clean"
+	  :build-system emc:*default-build-system*
+	  :build-dir default-directory
+	  )))
     
   (ignore makefile make-macros targets wait build-dir)
 
@@ -1547,19 +1551,20 @@ The variables KEYS, MAKEFILE, MAKE-MACROS, WAIT, TARGETS, BUILD-SYSTEM
 and BUILD-DIR are as per `emc:make'."
 
   (interactive
-   (emc::read-command-minibuffer current-prefix-arg
-				 '(:build-system
-				   :makefile
-				   :source-dir
-				   :build-dir
-				   :make-macros
-				   :targets)
-				 (list :makefile "Makefile"
-				       :make-macros ""
-				       :targets "clean"
-				       :build-system emc:*default-build-system*
-				       :build-dir default-directory
-				       )))
+   (emc::read-command-parms-minibuffer
+    current-prefix-arg
+    '(:build-system
+      :makefile
+      :source-dir
+      :build-dir
+      :make-macros
+      :targets)
+    (list :makefile "Makefile"
+	  :make-macros ""
+	  :targets "clean"
+	  :build-system emc:*default-build-system*
+	  :build-dir default-directory
+	  )))
   
   (ignore makefile make-macros targets wait build-dir)
 
@@ -1637,6 +1642,52 @@ whether EMC prints out progress messages."
   )
 
 
+;; emc-mode
+;; Minor mode, just to get the "EMC" menu.
+
+(define-minor-mode emc-mode
+  "Toggles the minor mode providing a menu for \\='EMC\\=' commands."
+
+  :init-value nil
+  :lighter " EMC"
+
+  ;; Set up the "EMC" menu.
+
+  (easy-menu-define emc::menu (list prog-mode-map dired-mode-map)
+    "EMC menu choices"
+    '("EMC"
+      :help "The EMC selectors and commands"
+      ("Build System"
+       :help "Known build systems; choose one"
+       ["make" (setq-local emc:*default-build-system* 'make) t]
+       ["cmake"(setq-local emc:*default-build-system* 'cmake) t]
+       )
+      "---"
+      "Commands"
+      ["Run" emc:run "Runs the generic builder function"]
+      "---"
+      ["Setup" emc:setup
+       "Sets up the build; mostly useful for CMake"]
+      ["Build" emc:build
+       "Builds the project/library"]
+      ["Install" emc:install
+       "Installs the project/library"]
+      ["Uninstall" emc:uninstall
+       "Uninstalls the project/library; CMake must be setup accordingly"]
+      ["Clean" emc:clean
+       "Cleans the build directory"]
+      ["Fresh" emc:fresh
+       "Refresh the build directory; moslty useful for CMake"]
+      "---"
+      ["EMC panel" emc:emc
+       "Starts the Emacs EMC interaction panel"]
+      )
+    )
+
+  'emc-mode
+  )
+
+
 ;; EMC panel.
 ;; ----------
 ;;
@@ -1686,10 +1737,17 @@ a nice keymap and look.
 You an use the function key \\='F3\\=' (i.e., \\='PF3\\=') or the
 \\='[Qq]\\=' keys to exit the EMC panel."
 
-  (message "EMC: using local map %S"
-	   (keymap-lookup emc::keymap "q"))
+  ;; (message "EMC: using local map %S" (keymap-lookup emc::keymap "q"))
   (use-local-map emc::keymap)
-  (message "EMC: keymap is now %s" (current-local-map))
+  ;; (message "EMC: keymap is now %s" (current-local-map))
+
+  (setq-local mode-line-format 
+	      (identity
+	       '(" "
+		 mode-line-buffer-identification
+		 " "
+		 mode-line-modes
+		 " Use 'Q', 'q', or '<F3>' to quit")))
   )
 
 
@@ -1754,11 +1812,11 @@ the ancillary window."
 					     ))
 			 )
 
-		    (message "EMC: %s %s %s %s"
-			     build-system
-			     src-dir
-			     bin-dir
-			     cmdline)
+		    ;; (message "EMC: %s %s %s %s"
+		    ;; 	     build-system
+		    ;; 	     src-dir
+		    ;; 	     bin-dir
+		    ;; 	     cmdline)
 		    (widget-value-set cmd-widget cmdline)
 		    )))			; modify-cmd-widget
 
@@ -1931,7 +1989,7 @@ the ancillary window."
       (setq make-macros-widget
 	    (widget-create 'string
 			   :value ""
-			   :format "Macros : %v"
+			   :format "Macros          : %v"
 			   :size 40
 			   :notify (lambda (w &rest ignore)
 				     (ignore w ignore)
