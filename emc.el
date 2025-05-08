@@ -12,7 +12,7 @@
 ;; Summary: Invoking a C/C++ (and other) build toolchain from Emacs.
 ;;
 ;; Created: 2025-01-02
-;; Version: 2025-05-06
+;; Version: 2025-05-08
 ;;
 ;; Keywords: languages, operating systems, binary platform.
 
