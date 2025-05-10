@@ -30,3 +30,12 @@ command* as well.
 
 Added `emc:craft-command` in order to make the `emc` *GUI* (using the
 Emacs `widget` library) easier to write.
+
+
+## 2025-05-10
+
+The overall contraption works (for an appropriate definition of
+"works".  In general, should we add somethong other than **make** and
+**cmake** the code should be refactored to accomodate the actual
+double dispatch *platform*/*build system* (or:
+*platform*/*tool*/*build system*, as in `darwin/gcc/cmake`).  Not now.
