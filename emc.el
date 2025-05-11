@@ -120,7 +120,7 @@
 (require 'cl-lib)
 (require 'compile)
 (require 'dired)
-;; (require 'delight)			; Only non built-in dependency.
+(require 'delight)			; Only non built-in dependency.
 
 
 (cl-deftype emc:build-system-type ()
@@ -530,6 +530,20 @@ Returns a directory."
   (read-directory-name prompt directory nil directory))
 
 
+(cl-defun emc::read-makefile-name (&key (directory default-directory)
+					(use-system-dialog nil))
+  "Read the name of a proper \\='Makefile\\='.
+
+DIRECTORY is passed as default DIR to `read-file-name'  If
+USE-SYSTEM-DIALOG is T, then a dialog box is used to select the
+\\='Makefile\\=' (cf., `use-dialog-box'; default is NIL).
+
+Returns a directory."
+  (let ((use-dialog-box use-system-dialog))
+    (when use-dialog-box (message "EMC: find a 'Makefile' in %s" directory))
+    (read-file-name "Makefile: " directory "Makefile" t "Makefile")))
+
+
 (cl-defun emc::read-string (prompt &rest args)
   "Read a \\='string\\=' from the minibuffer.
 
@@ -544,7 +558,7 @@ Returns a string."
 (cl-defun emc::read-ensure-build-system (&optional build-system)
   "Ensure that a \\='build system\\=' has been chosen.
 
-The optional argument BUILD-SYSTEM cna be one of the known build
+The optional argument BUILD-SYSTEM can be one of the known build
 systems.  The buffer local variable `emc:*default-build-system' will
 be set to a known build system after this function is run.  If both
 BUILD-SYSTEM and `emc:*default-build-system*' are NIL, then a new
@@ -824,7 +838,8 @@ folder where \\='make\\=' will be invoked.  DRY-RUN runs the
   (concat (if bd-p (concat "cd " build-dir " ; ") "")
 	  "make "
           (when (and makefile-p (not (string-empty-p makefile)))
-	    (format "-f %s " (shell-quote-argument makefile)))
+	    ;; (format "-f %s " (shell-quote-argument makefile))
+	    (format "-f %s " makefile))
           (when (and make-macros-p (not (string-empty-p make-macros)))
 	    (concat (shell-quote-argument make-macros) " "))
 	  (when dry-run "-n ")
@@ -1114,21 +1129,43 @@ executing it."
 					    :dry-run nil
 					    ))))
 
-  (ignore dry-run source-dir install-dir)
+  ;; This may be removed.
   
-  ;; Some preventive basic error checking.
-
   (cl-assert (or (eq build-system 'make) (eq build-system :make))
 	     t
 	     "build system is '%s', but it should be 'make'")
+
+  ;; Ensure we have a proper Makefile.
   
+  (when (and (called-interactively-p 'any) (null current-prefix-arg))
+    ;; The function was called interactivle but without the "full"
+    ;; reading of keyword parameters.
+    
+    (unless (or (file-exists-p makefile)
+		(file-exists-p
+		 (expand-file-name (file-name-nondirectory makefile)
+				   build-dir)))
+      (setf makefile
+	    (emc::read-makefile)
+	    ;; (read-file-name "Makefile: " nil "Makefile" t "Makefile")
+	    )
+      ))
+
+  ;; End interactive handling.
+
+  (ignore dry-run source-dir install-dir)
+
+  ;; Some preventive basic error checking.
+
   (unless (file-directory-p build-dir)
     (error "EMC: error: non-existing build directory %S" build-dir))
 
+  ;; This is a check useful for non-interactive calls.
+  
   (unless (or (file-exists-p makefile)
 	      (file-exists-p
-	       (file-name-concat build-dir
-				 (file-name-nondirectory makefile))))
+	       (expand-file-name (file-name-nondirectory makefile)
+				 build-dir)))
     (error "EMC: error: no %S in build directory %S" makefile build-dir))
 
 
@@ -1138,9 +1175,13 @@ executing it."
   (message "EMC: makefile:    %S" makefile)
   (message "EMC: make-macros: %S" make-macros)
   (message "EMC: targets:     %S" targets)
+  (message "EMC: keys:        %S" keys)
   (message "EMC: making...")
 
-  (apply #'emc:start-making (emc::platform-type) build-system keys)
+  (apply #'emc:start-making (emc::platform-type) build-system
+	 :makefile makefile		; Ensure we have the right
+					; makefile.
+	 keys)
 
   (when wait
     (message "EMC: waiting...")
@@ -1381,6 +1422,10 @@ without executing it."
   (unless (file-directory-p install-dir)
     (error "EMC: error: non-existing install directory %S" build-dir))
 
+  (unless (file-exists-p (expand-file-name "CMakeLists.txt" source-dir))
+    (error "EMC: error: no 'CMakeLists.txt' file found in\n     %s" source-dir)
+    )
+
   ;; Here we go.
 
   (message "EMC: running 'cmake' command %S" cmd)
@@ -1576,11 +1621,34 @@ and BUILD-DIR are as per `emc:make'."
 		      )))
      )
    )
+
   
   (ignore makefile make-macros targets wait build-dir)
 
   (cl-case (emc::normalize-build-system build-system)
-    ((make :make) t)
+    ((make :make)
+
+     (when (and (called-interactively-p 'any) (null current-prefix-arg))
+       ;; The function was called interactivle but without the "full"
+       ;; reading of keyword parameters.
+    
+       (unless (or (file-exists-p makefile)
+		   (file-exists-p
+		    (expand-file-name (file-name-nondirectory makefile)
+				      build-dir)))
+	 (setf makefile
+	       (emc::read-makefile-name)
+	       ;; (read-file-name "Makefile: " nil "Makefile" t "Makefile")
+	       )
+	 ))
+       
+     (if (string-search "setup" targets)
+	 (apply #'emc:make :makefile makefile keys)
+       (progn
+	 (warn "EMC: warn: 'setup' command not foreseen for 'make'")
+	 t))
+     )
+    
     ((cmake :cmake) (apply #'emc:cmake :setup keys))
     (t
      (error "EMC: error: unknown build system %S" build-system))
@@ -1674,7 +1742,24 @@ and BUILD-DIR are as per `emc:make'."
   (ignore makefile make-macros targets wait build-dir source-dir)
 
   (cl-case (emc::normalize-build-system build-system)
-    ((make :make) (apply #'emc:make keys))
+    ((make :make)
+
+     (when (and (called-interactively-p 'any) (null current-prefix-arg))
+       ;; The function was called interactivle but without the "full"
+       ;; reading of keyword parameters.
+       
+       (unless (or (file-exists-p makefile)
+		   (file-exists-p
+		    (expand-file-name (file-name-nondirectory makefile)
+				      build-dir)))
+	 (setf makefile
+	       (emc::read-makefile-name)
+	       ;; (read-file-name "Makefile: " nil "Makefile" t "Makefile")
+	       )
+	 ))
+     
+     (apply #'emc:make :makefile makefile keys))
+    
     ((cmake :cmake) (apply #'emc:cmake :build keys))
     (t
      (error "EMC: error: unknown build system %S" build-system))
@@ -1688,6 +1773,7 @@ and BUILD-DIR are as per `emc:make'."
                              (targets "install")
 			     (wait nil)
 			     (build-system :make)
+			     (build-dir default-directory)
 			     (install-dir default-directory)
                              &allow-other-keys)
   "EMC Install command.
@@ -1706,25 +1792,43 @@ and BUILD-DIR are as per `emc:make'."
 		current-prefix-arg
 		build-system
 		'(:makefile
+		  :build-dir
 		  :install-dir
 		  )
 		(list :makefile "Makefile"
 		      :make-macros ""
 		      :targets ""
+		      :build-dir default-directory
 		      :install-dir default-directory
 		      )))
      )
    )
   
-  (ignore makefile make-macros targets wait install-dir)
+  (ignore makefile make-macros targets wait install-dir build-dir)
 
   (cl-case (emc::normalize-build-system build-system)
     ((:make make)
+
+     (when (and (called-interactively-p 'any) (null current-prefix-arg))
+       ;; The function was called interactivle but without the "full"
+       ;; reading of keyword parameters.
+       
+       (unless (or (file-exists-p makefile)
+		   (file-exists-p
+		    (expand-file-name (file-name-nondirectory makefile)
+				      build-dir)))
+	 (setf makefile
+	       (emc::read-makefile-name)
+	       ;; (read-file-name "Makefile: " nil "Makefile" t "Makefile")
+	       )
+	 ))
+     
      (let ((targets (if (string-equal-ignore-case "install" targets)
 			targets
 		      (concat "install " targets)))
 	   )
-       (apply #'emc:make :targets targets keys)))
+       (apply #'emc:make :makefile makefile :targets targets keys)))
+    
     ((cmake :cmake)
      (apply #'emc:cmake :install keys))
     (t
@@ -1739,6 +1843,7 @@ and BUILD-DIR are as per `emc:make'."
                                (targets "uninstall")
 			       (wait nil)
 			       (build-system emc:*default-build-system*)
+			       (build-dir default-directory)
 			       (install-dir default-directory)
                                &allow-other-keys)
   "EMC Uninstall command.
@@ -1757,11 +1862,13 @@ and BUILD-DIR are as per `emc:make'."
 		current-prefix-arg
 		build-system
 		'(:makefile
+		  :build-dir
 		  :install-dir
 		  )
 		(list :makefile "Makefile"
 		      :make-macros ""
 		      :targets ""
+		      :build-dir default-directory
 		      :install-dir default-directory
 		      )))
      )
@@ -1771,11 +1878,27 @@ and BUILD-DIR are as per `emc:make'."
 
   (cl-case (emc::normalize-build-system build-system)
     ((make :make)
+
+     (when (and (called-interactively-p 'any) (null current-prefix-arg))
+       ;; The function was called interactivle but without the "full"
+       ;; reading of keyword parameters.
+       
+       (unless (or (file-exists-p makefile)
+		   (file-exists-p
+		    (expand-file-name (file-name-nondirectory makefile)
+				      build-dir)))
+	 (setf makefile
+	       (emc::read-makefile-name)
+	       ;; (read-file-name "Makefile: " nil "Makefile" t "Makefile")
+	       )
+	 ))
+     
      (let ((targets (if (string-equal-ignore-case "uninstall" targets)
 			targets
 		      (concat "uninstall " targets)))
 	   )
-       (apply #'emc:make :targets targets keys)))
+       (apply #'emc:make :makefile makefile :targets targets keys)))
+    
     ((cmake :cmake)
      (warn "EMC: warning: ensure the 'CMakeLists.txt' files handle 'uninstall'")
      (apply #'emc:cmake :uninstall keys))
@@ -1867,11 +1990,27 @@ and BUILD-DIR are as per `emc:make'."
 
   (cl-case (emc::normalize-build-system build-system)
     ((make :make)
+
+     (when (and (called-interactively-p 'any) (null current-prefix-arg))
+       ;; The function was called interactivle but without the "full"
+       ;; reading of keyword parameters.
+       
+       (unless (or (file-exists-p makefile)
+		   (file-exists-p
+		    (expand-file-name (file-name-nondirectory makefile)
+				      build-dir)))
+	 (setf makefile
+	       (emc::read-makefile-name)
+	       ;; (read-file-name "Makefile: " nil "Makefile" t "Makefile")
+	       )
+	 ))
+	 
      (let ((targets (if (string-equal-ignore-case "clean" targets)
 			targets
 		      (concat "clean " targets)))
 	   )
-       (apply #'emc:make :targets targets keys)))
+       (apply #'emc:make :makefile makefile :targets targets keys)))
+    
     ((cmake :cmake) (apply #'emc:cmake :clean keys))
     (t
      (error "EMC: error: unknown build system %S" build-system))
@@ -1921,12 +2060,29 @@ and BUILD-DIR are as per `emc:make'."
 
   (cl-case (emc::normalize-build-system build-system)
     ((make :make)
-     (let ((targets (if (string-equal-ignore-case "fresh" targets)
-			targets
-		      (concat "fresh " targets)))
-	   )
-       (warn "EMC: warning: ensure 'Makefile's have a 'fresh' target")
-       (apply #'emc:make :targets targets keys)))
+
+     (when (and (called-interactively-p 'any) (null current-prefix-arg))
+       ;; The function was called interactivle but without the "full"
+       ;; reading of keyword parameters.
+    
+       (unless (or (file-exists-p makefile)
+		   (file-exists-p
+		    (expand-file-name (file-name-nondirectory makefile)
+				      build-dir)))
+	 (setf makefile
+	       (emc::read-makefile-name)
+	       ;; (read-file-name "Makefile: " nil "Makefile" t "Makefile")
+	       )
+	 ))
+
+     (if (string-search "fresh" targets)
+	 (apply #'emc:make :makefile makefile keys)
+       (progn
+	 (warn (concat "EMC: warn: 'fresh' command not foreseen for 'make'; "
+		       "maybe you mean 'clean'?"))
+	 t))
+     )
+    
     ((cmake :cmake) (apply #'emc:cmake :fresh keys))
     (t
      (error "EMC: error: unknown build system %S" build-system))
@@ -2007,6 +2163,13 @@ whether EMC prints out progress messages."
   :init-value nil
   :lighter " EMC"
 
+  ;; Ensure that `emc:*default-build-system*' has a local value.
+
+  (when (null emc:*default-build-system*)
+    ;; If non NIL it was set, and is, therefore, local.
+    
+    (setq-local emc:*default-build-system* nil))
+  
   ;; Set up the "EMC" menu.
 
   (easy-menu-define emc::menu (list prog-mode-map dired-mode-map)
@@ -2015,12 +2178,22 @@ whether EMC prints out progress messages."
       :help "The EMC selectors and commands"
       ("Build System"
        :help "Known build systems; choose one"
-       ["make" (setq-local emc:*default-build-system* 'make)
+       ["make" (progn
+		 (setq-local emc:*default-build-system* 'make)
+		 (when (fboundp 'delight)
+		   (delight '((emc-mode " EMC[make]" "emc")))
+		   )
+		 )
 	:enable t
 	:selected (eq emc:*default-build-system* 'make)
 	:style radio
 	]
-       ["cmake"(setq-local emc:*default-build-system* 'cmake)
+       ["cmake" (progn
+		  (setq-local emc:*default-build-system* 'cmake)
+		  (when (fboundp 'delight)
+		    (delight '((emc-mode " EMC[cmake]" "emc")))
+		    )
+		  )
 	:enable	t
 	:selected (eq emc:*default-build-system* 'cmake)
 	:style radio
