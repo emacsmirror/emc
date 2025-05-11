@@ -12,7 +12,7 @@
 ;; Summary: Invoking a C/C++ (and other) build toolchain from Emacs.
 ;;
 ;; Created: 2025-01-02
-;; Version: 2025-05-10
+;; Version: 2025-05-11
 ;;
 ;; Keywords: languages, operating systems, binary platform.
 
@@ -120,6 +120,7 @@
 (require 'cl-lib)
 (require 'compile)
 (require 'dired)
+;; (require 'delight)			; Only non built-in dependency.
 
 
 (cl-deftype emc:build-system-type ()
@@ -194,8 +195,8 @@ toolchains."
 (defcustom emc:*default-build-system* nil
   "The EMC default build system.
 
-Initially the value is NIL; the first time a its value is required it
-will be set locally in the buffer."
+Initially the value is NIL; the first time its value is required, it
+will be locally set in the buffer."
   :group 'emc
   :type 'symbol
   :options '(make cmake)
@@ -203,8 +204,8 @@ will be set locally in the buffer."
   )
 
 
-;; Generic API exported functions.
-;; -------------------------------
+;; API exported functions and variables.
+;; -------------------------------------
 ;;
 ;; I reuse the 'compile.el' machinery.
 
@@ -393,7 +394,6 @@ See Also:
 ;;     ))
 
 
-
 (cl-defun emc::read-command-parms
     (&optional prefix-argument
 	       (build-system emc:*default-build-system*)
@@ -486,7 +486,7 @@ callers."
 ;;; Single purpose reader functions.
 
 (cl-defun emc::read-cmd (&rest args)
-  "Reads the EMC \\='command\\=' from the minibuffer.
+  "Read the EMC \\='command\\=' from the minibuffer.
 
 ARGS is ignored.
 Returns a symbol."
@@ -505,7 +505,7 @@ Returns a symbol."
 
 
 (cl-defun emc::read-build-system (&rest args)
-  "Reads the EMC \\='command\\=' from the minibuffer.
+  "Read the EMC \\='command\\=' from the minibuffer.
 
 ARGS is ignored.
 Returns a symbol."
@@ -1062,6 +1062,9 @@ progress messages."
       )))
 
 
+;; make and make `emc:start-making' methods.
+;; -----------------------------------------
+
 (cl-defun emc:make (&rest keys
                           &key
                           (makefile "Makefile")
@@ -1191,13 +1194,15 @@ initial target list (actually a space separated string)."
 				 (build-system (eql 'make))
 				 &rest keys
 				 &key
-				 (command 'buil)
+				 (command 'build)
 				 (targets "")
 				 &allow-other-keys)
   "Dispatch to the specialized machinery.
 
 The proper calls for the pair SYS equal to \\='windows-nt\\=' and
-BUILD-SYSTEM equal to \\='make\\=' is invoked with KEYS."
+BUILD-SYSTEM equal to \\='make\\=' is invoked with KEYS.  COMMAND is the
+actual EMC command indicator (a symbol).  TARGETS is the initial target
+list (actually a space separated string)."
   
   (ignore sys build-system)
   (let ((tgts (emc::craft-make-targets command targets)))
@@ -1219,7 +1224,9 @@ BUILD-SYSTEM equal to \\='make\\=' is invoked with KEYS."
   "Dispatch to the specialized machinery.
 
 The proper calls for the pair SYS equal to \\='windows-nt\\=' and
-BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
+BUILD-SYSTEM equal to \\='make\\=' is invoked with KEYS.  COMMAND is the
+actual EMC command indicator (a symbol).  TARGETS is the initial target
+list (actually a space separated string)."
   
   (ignore sys build-system)
 
@@ -1318,6 +1325,7 @@ BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
 
 
 ;; CMake and CMake `emc:start-making' methods.
+;; -------------------------------------------
 
 (cl-defun emc:cmake (cmd &rest keys
                          &key
@@ -1505,7 +1513,6 @@ BUILD-SYSTEM equal to \\=':cmake\\=' is invoked with KEYS."
   (ignore sys build-system)
   (emc::invoke-make (apply #'emc:unix-cmake-cmd keys))
   )
-
 
 
 (cl-defmethod emc:start-making ((sys (eql 'darwin))
@@ -2008,8 +2015,16 @@ whether EMC prints out progress messages."
       :help "The EMC selectors and commands"
       ("Build System"
        :help "Known build systems; choose one"
-       ["make" (setq-local emc:*default-build-system* 'make) t]
-       ["cmake"(setq-local emc:*default-build-system* 'cmake) t]
+       ["make" (setq-local emc:*default-build-system* 'make)
+	:enable t
+	:selected (eq emc:*default-build-system* 'make)
+	:style radio
+	]
+       ["cmake"(setq-local emc:*default-build-system* 'cmake)
+	:enable	t
+	:selected (eq emc:*default-build-system* 'cmake)
+	:style radio
+	]
        )
       "---"
       "Commands"
