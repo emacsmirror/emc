@@ -267,133 +267,6 @@ See Also:
 ;; Bottom line: `interactive' and `cl-defun' mix well only in simple
 ;; cases.
 
-;; emc::read-command-minibuffer
-
-;; (cl-defun emc::read-command-minibuffer (&optional prefix-argument
-;; 						  (parms-to-be-read ())
-;; 						  defaults)
-;;   "Read the common build system parameters from minibuffer.
-
-;; PREFIX-ARGUMENT is possibly bound to PREFIX-ARG.  PARMS-TO-BE-READ
-;; contains a list of standard-parameters to be read interactively; if
-;; empty (i.e., NIL) all parameters are read interactively.  DEFAULTS is
-;; a keyword p-list (passed down from \\='&rest keys\\=' parameters by
-;; callers."
-;;   (let* ((read-answer-short nil)	; Force long answers.
-;; 	 (cmd
-;; 	  (car
-;; 	   (read-from-string
-;; 	    (read-answer "Command: "
-;; 			 '(("setup" ?s "setup the project")
-;; 			   ("build" ?b "build the project")
-;; 			   ("install" ?i "install the project")
-;; 			   ("uninstall" ?u "uninstall the project")
-;; 			   ("fresh" ?f "freshen the project")
-;; 			   ("clean" ?c "clean the project")
-;; 			   ))))
-;; 	  )
-;; 	 (parms
-;; 	  (emc::read-command-parms-minibuffer prefix-argument
-;; 					      parms-to-be-read
-;; 					      defaults))
-;; 	 )
-    
-;;     (when emc:*verbose*
-;;       (message "EMC: read build parms from minibuffer (%S %S)."
-;; 	       prefix-arg
-;; 	       prefix-argument))
-    
-;;     (cl-list* cmd parms)
-;;     ))
-
-
-;; emc::read-command-parms-minibuffer
-
-;; (cl-defun emc::read-command-parms-minibuffer (&optional prefix-argument
-;; 							(parms-to-be-read ())
-;; 							defaults)
-;;   "Read the common command parameters from minibuffer.
-
-;; PREFIX-ARGUMENT is possibly bound to PREFIX-ARG.  PARMS-TO-BE-READ
-;; contains a list of standard-parameters to be read interactively; if
-;; empty (i.e., NIL) all parameters are read interactively.  DEFAULTS is
-;; a keyword p-list (passed down from \\='&rest keys\\=' parameters by
-;; callers."
-;;   (let ((read-answer-short nil)		; Force long answers.
-;; 	)
-;;     (cl-macrolet ((read-parm (parm &body reader)
-;; 		    `(if (or (null parms-to-be-read)
-;; 			     (memq ',parm parms-to-be-read))
-;; 			 ,@reader
-;; 		       (cl-getf defaults ',parm)
-;; 		       ))
-;; 		  )
-    
-;;       (if prefix-argument
-;; 	  (let* (
-;; 		 ;; (build-system
-;; 		 ;;  (read-parm :build-system
-;; 		 ;; 	     (intern
-;; 		 ;; 	      (read-answer "Build with: "
-;; 		 ;; 			   '(("make" ?m "use 'make'.")
-;; 		 ;; 			     ("cmake" ?c "use 'cmake'.")
-;; 		 ;; 			     ))))
-;; 		 ;;  )
-;; 		 (makefile
-;; 		  (read-parm :makefile
-;; 			     (when (string-equal build-system "make")
-;; 			       (read-from-minibuffer
-;; 				"Makefile: "
-;; 				"Makefile"))))
-;; 		 (source-dir
-;; 		  (read-parm :source-dir
-;; 			     (expand-file-name
-;; 			      (read-directory-name
-;; 			       "Source directory: "))))
-;; 		 (build-dir
-;; 		  (read-parm :build-dir
-;; 			     (expand-file-name
-;; 			      (read-directory-name
-;; 			       "Build directory: "))))
-;; 		 (install-dir
-;; 		  (read-parm :install-dir
-;; 			     (expand-file-name
-;; 			      (read-directory-name
-;; 			       "Install directory: "))))
-;; 		 (macros
-;; 		  (read-parm :make-macros
-;; 			     (read-from-minibuffer
-;; 			      "Macros: " nil nil nil nil "")))
-;; 		 (targets
-;; 		  (read-parm :targets
-;; 			     (read-from-minibuffer
-;; 			      "Targets: " nil nil nil nil "")))
-;; 		 )
-;; 	    (append ; (and build-system (list :build-system build-system))
-;; 		    (and source-dir (list :source-dir source-dir))
-;; 		    (and build-dir (list :build-dir build-dir))
-;; 		    (and install-dir (list :install-dir install-dir))
-;; 		    (and macros (list :make-macros macros))
-;; 		    (and targets (list :targets targets))
-;; 		    (and makefile (list :makefile makefile))
-;; 		    ;; (and current-prefix-arg (list :prefix current-prefix-arg))
-;; 		    ))
-      
-;; 	;; Default is no prefix arg was given.
-      
-;; 	(list :build-system emc:*default-build-system*
-;; 	      :source-dir default-directory
-;; 	      :build-dir default-directory
-;; 	      :install-dir default-directory
-;; 	      :make-macros ""
-;; 	      :targets ""
-;; 	      :makefile "Makefile"
-;; 	      ;; :prefix current-prefix-arg
-;; 	      ))
-;;       )					; macrolet
-;;     ))
-
-
 (cl-defun emc::read-command-parms
     (&optional prefix-argument
 	       (build-system emc:*default-build-system*)
@@ -1138,7 +1011,7 @@ executing it."
   ;; Ensure we have a proper Makefile.
   
   (when (and (called-interactively-p 'any) (null current-prefix-arg))
-    ;; The function was called interactivle but without the "full"
+    ;; The function was called interactively but without the "full"
     ;; reading of keyword parameters.
     
     (unless (or (file-exists-p makefile)
@@ -1146,7 +1019,7 @@ executing it."
 		 (expand-file-name (file-name-nondirectory makefile)
 				   build-dir)))
       (setf makefile
-	    (emc::read-makefile)
+	    (emc::read-makefile-name)
 	    ;; (read-file-name "Makefile: " nil "Makefile" t "Makefile")
 	    )
       ))
@@ -1447,46 +1320,6 @@ without executing it."
   )
 
 
-;; To be removed.
-
-;; (cl-defgeneric emc:cmake-gf (cmd &rest keys &key &allow-other-keys)
-;;   "Interface for \\='cmake\\='.
-;;
-;; The CMD parameter works almost like the \\='cmake\\=' command line
-;; couterpart.  KEYS groups the extra parameters passed to the
-;; function.")
-;;
-;;
-;; (cl-defmethod emc:cmake-gf ((cmd (eql :build)) &key &allow-other-keys)
-;;   "Method to invoke \\='cmake\\=' \"build\" command, when CMD is \\=':build\\='."
-;;   (ignore cmd)
-;;   )
-;;
-;;
-;; (cl-defmethod emc:cmake-gf ((cmd (eql :install)) &key &allow-other-keys)
-;;   "Method to invoke \\='cmake\\=' \"build\" command, when CMD is \\=':install\\='."
-;;   (ignore cmd)
-;;   )
-;;
-;;
-;; (cl-defmethod emc:cmake-gf ((cmd (eql :uninstall)) &key &allow-other-keys)
-;;   "Method to invoke \\='cmake\\=' \"build\" command, when CMD is \\=':uninstall\\='."
-;;   (ignore cmd)
-;;   )
-;;
-;;
-;; (cl-defmethod emc:cmake-gf ((cmd (eql :build)) &key &allow-other-keys)
-;;   "Method to invocke \\='cmake\\=' \"build\" command, when CMD is \\=':build\\='."
-;;   (ignore cmd)
-;;   )
-;;
-;;
-;; (cl-defmethod emc:cmake-gf ((cmd (eql :fresh)) &key &allow-other-keys)
-;;   "Method to invoke \\='cmake\\=' \"build\" command, when CMD is \\=':fresh\\='."
-;;   (ignore cmd)
-;;   )
-
-
 (cl-defmethod emc:craft-command ((sys (eql 'windows-nt))
 				 (build-system (eql 'cmake))
 				 &rest keys
@@ -1653,52 +1486,6 @@ and BUILD-DIR are as per `emc:make'."
     (t
      (error "EMC: error: unknown build system %S" build-system))
     ))
-
-
-;; Old
-;; (cl-defun emc:build (&rest keys
-;;                            &key
-;;                            (makefile "Makefile")
-;;                            (make-macros "")
-;;                            (targets "")
-;; 			   (wait nil)
-;; 			   (build-system emc:*default-build-system*)
-;; 			   (build-dir default-directory)
-;; 			   (source-dir default-directory)
-;;                            &allow-other-keys)
-;;   "EMC Build command.
-
-;; For a \\'make\\=' based build it is essentially a no-op.  For a
-;; \\'CMake\\' based build system it re-packages the targets and calls the
-;; relevant function.
-
-;; The variables KEYS, MAKEFILE, MAKE-MACROS, WAIT, TARGETS, BUILD-SYSTEM
-;; and BUILD-DIR are as per `emc:make'."
-
-;;   (interactive
-;;    (emc::read-command-parms-minibuffer
-;;     current-prefix-arg
-;;     '(:build-system
-;;       :makefile
-;;       :source-dir
-;;       :build-dir
-;;       :make-macros
-;;       :targets)
-;;     (list :makefile "Makefile"
-;; 	  :make-macros ""
-;; 	  :targets ""
-;; 	  :build-system emc:*default-build-system*
-;; 	  :build-dir default-directory
-;; 	  )))
-  
-;;   (ignore makefile make-macros targets wait build-dir)
-
-;;   (cl-case (emc::normalize-build-system build-system)
-;;     ((make :make) (apply #'emc:make keys))
-;;     ((cmake :cmake) (apply #'emc:cmake :build keys))
-;;     (t
-;;      (error "EMC: error: unknown build system %S" build-system))
-;;     ))
 
 
 (cl-defun emc:build (&rest keys
@@ -1905,52 +1692,6 @@ and BUILD-DIR are as per `emc:make'."
     (t
      (error "EMC: error: unknown build system %S" build-system))
     ))
-
-
-;; (cl-defun emc:clean (&rest keys
-;;                            &key
-;;                            (makefile "Makefile")
-;;                            (make-macros "")
-;;                            (targets "clean")
-;; 			   (wait nil)
-;; 			   (build-system emc:*default-build-system*)
-;; 			   (build-dir default-directory)
-;;                            &allow-other-keys)
-;;   "EMC Clean command.
-
-;; For a \\'make\\=' based build it is essentially a no-op.  For a
-;; \\'CMake\\' based build system it re-packages the targets and calls the
-;; relevant function.
-
-;; The variables KEYS, MAKEFILE, MAKE-MACROS, WAIT, TARGETS, BUILD-SYSTEM
-;; and BUILD-DIR are as per `emc:make'."
-
-;;   (interactive
-;;    (emc::read-command-parms-minibuffer
-;;     current-prefix-arg
-;;     '(:build-system
-;;       :makefile
-;;       )
-;;     (list :makefile "Makefile"
-;; 	  :make-macros ""
-;; 	  :targets "clean"
-;; 	  :build-system emc:*default-build-system*
-;; 	  :build-dir default-directory
-;; 	  )))
-    
-;;   (ignore makefile make-macros targets wait build-dir)
-
-;;   (cl-case (emc::normalize-build-system build-system)
-;;     ((make :make)
-;;      (let ((targets (if (string-equal-ignore-case "clean" targets)
-;; 			targets
-;; 		      (concat "clean " targets)))
-;; 	   )
-;;        (apply #'emc:make :targets targets keys)))
-;;     ((cmake :cmake) (apply #'emc:cmake :clean keys))
-;;     (t
-;;      (error "EMC: error: unknown build system %S" build-system))
-;;     ))
 
 
 (cl-defun emc:clean (&rest keys
