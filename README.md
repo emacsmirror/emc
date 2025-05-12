@@ -15,7 +15,7 @@ different platforms make the process quite a bit more complicated.
 The goal of this library is to hide some of these details for Unix
 (Linux), Mac OS and Windows.  The **EMC** (`emc`) library interfaces
 to `make` and `nmake` building setups and to
-[`cmake`](https://www.cmake.org){:target="_blank"}.
+[`cmake`](https://www.cmake.org).
 
 The supported `Makefile` combinations are:
 
@@ -27,10 +27,10 @@ The supported `Makefile` combinations are:
 
 
 On Windows **EMC** assumes the installation of
-[Microsoft Visual Studio](https://visualstudio.microsoft.com){:target="_blank"}
+[Microsoft Visual Studio](https://visualstudio.microsoft.com)
 (Community -- provisions are made to handle the Enterprise or other
 versions, but they are untested).
-[`MSYS`](https://www.msys.org){:target="_blank"} will be added in the
+[`MSYS`](https://www.msys.org) will be added in the
 future, but is will mostly look like UNIX.
 
 There are three main `emc` commands: `emc:run`, `emc:make`, and
