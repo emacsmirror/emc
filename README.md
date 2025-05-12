@@ -45,16 +45,16 @@ platform supplying hopefully reasonable defaults.  E.g.,
 ```
 or
 ```
-    (emc:run)
+	(emc:run)
 ```
 from ELisp code, will usually result in a call to
 ```
-    make -f Makefile
+	make -f Makefile
 ```
 on UN\*X platforms.
 
 
-### `make`
+### **make**
 
 All in all, the easiest way to use this library is to invoke the
 `emc:make` command, which invokes the underlying build system (at the
@@ -72,7 +72,7 @@ dependent "make" command.  On MacOS and Linux/UNIX system this
 defaults to:
 
 ```
-    make -f Makefile
+	make -f Makefile
 ```
 
 On Windows with MSVC this defaults to (assuming MSVC is installed on drive
@@ -107,7 +107,7 @@ will ask you for the `Makefile` name, the "build directory", the
 "source directory", the `make` "targets" and so on.
 
 
-### `cmake`
+### **cmake**
 
 To invoke `cmake` the relevant function is `emc:cmake` which takes
 the following "sub-commands" (the `<bindir>` below is to be
@@ -124,6 +124,7 @@ As for `emc:make`, you can invoke the `emc:cmake` command either as
 `M-x emc:make` or `C-u M-x emc:cmake`.  In the first case **EMC** will
 assume that most parameters are already set; in the second case,
 **EMC** will ask for each parameter needed by the sub-command.
+
 
 ### Other Commands
 
@@ -143,16 +144,16 @@ commands.
 2. `emc:build`: which is equivalent to `cmake --build <bindir>` and to
    `make` issued in `<bindir>`; note that `make` will execute the
    recipe associated to the first target.
-3. `install`: which is equivalent to `cmake --install <bindir>`  and to
-   `make install` issued in `<bindir>`; note that `make` must provide
-   the `install` target.
-4. `uninstall`: which currently has no `cmake` equivalent.  To execute
+3. `emc:install`: which is equivalent to `cmake --install <bindir>`
+   and to `make install` issued in `<bindir>`; note that `make` must
+   provide the `install` target.
+4. `emc:uninstall`: which currently has no `cmake` equivalent.  To execute
    this command with `cmake`, `CMakeLists.txt` must make provisions to
    handle and generate the `uninstall` targets.
-5. `clean`: equivalent to `cmake --build <bindir> -t clean`,  and to
+5. `emc:clean`: equivalent to `cmake --build <bindir> -t clean`,  and to
    `make clean` issued in `<bindir>`; note that `make` must provide
    the `clean` target.
-5. `fresh`: equivalent to `cmake --fresh <bindir>`, and to `make
+5. `emc:fresh`: equivalent to `cmake --fresh <bindir>`, and to `make
    fresh`.  Note that this command usually does not mean much in a
    `make` based setup, unless the `Makefile` contains a `setup`
    target.
