@@ -79,7 +79,7 @@ On Windows with MSVC this defaults to (assuming MSVC is installed on drive
 `:C`)
 
 ```
-    (C:\Path\To\MSVC\...\vcvars64.bat) & nmake /F Makefile
+	(C:\Path\To\MSVC\...\vcvars64.bat) & nmake /F Makefile
 ```
 
 The `emc` package gives you several knobs to customize your environment,
@@ -88,11 +88,11 @@ the `emc:make` function for an initial set of arguments you can use.  E.g.,
 on Linux/UNIX the call
 
 ```
-    (emc:make :makefile "FooBar.mk" :build-dir "foobar-build")
+	(emc:make :makefile "FooBar.mk" :build-dir "foobar-build")
 ```
 will result in a call to `make` such as:
 ```
-    cd foobar-build ; make -f Foobar.mk
+	cd foobar-build ; make -f Foobar.mk
 ```
 as a result `compile` will do the right thing by intercepting the `cd`
 in the string.
