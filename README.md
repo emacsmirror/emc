@@ -1,6 +1,7 @@
 # **EMC** -- "Emacs Make Compile" (or "Emacs Master of Ceremonies")
 
-Invoking a C/C++ (and other) build tool-chain from Emacs.
+Invoking a C/C++ (and other) build tool-chain from
+[Emacs](https://www.gnu.org/software/emacs/).
 
 Marco Antoniotti
 See file COPYING for licensing and copyright information.
@@ -173,10 +174,10 @@ You can invoke the GUI by invoking the `emc:emc` Emacs command
 ## Documentation and Customization
 
 **EMC** is decently documented in its doc-strings (it passes `flycheck`
-and `flymake` scrutiny; apart from c couple of minor spots where both
+and `flymake` scrutiny; apart from a couple of minor spots where both
 tools cannot properly handle **Common Lisp** ELisp idioms).
 
-**EMC** is customizable.  You can find the `emc` custom group under
+**EMC** is customizable.  You can find the `emc` Emacs custom group under
 `Tools`.
 
 
