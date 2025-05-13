@@ -2042,6 +2042,7 @@ tools -> emc customization section.
 (defvar emc::keymap
   (let ((km (make-sparse-keymap)))
     (set-keymap-parent km widget-keymap)
+    (define-key km (kbd "<f1>") 'emc:help)
     (define-key km (kbd "<f3>") 'emc::exit-panel)
     (define-key km (kbd "q") 'emc::exit-panel)
     (define-key km (kbd "Q") 'emc::exit-panel)
@@ -2088,7 +2089,7 @@ You an use the function key \\='F3\\=' (i.e., \\='PF3\\=') or the
 		 mode-line-buffer-identification
 		 " "
 		 mode-line-modes
-		 " Use 'Q', 'q', or '<F3>' to quit")))
+		 " Use 'Q', 'q', or '<F3>' to quit; '<F1>' for help.")))
   )
 
 
@@ -2108,13 +2109,6 @@ the ancillary window."
     (erase-buffer))
 
   (emc::emc-panel-mode)
-
-  (message "EMC: key 'q' in current-local-map %S"
-	   (keymap-lookup (current-local-map) "q"))
-  (message "EMC: key 'q' in current-global-map %S"
-	   (keymap-lookup (current-global-map) "q"))
-  (message "EMC: local == global ? %S"
-	   (eql (current-local-map) (current-global-map)))
 
   (setq-local emc::from-buffer from-buffer)
   (setq-local emc::build-system-chosen emc:*default-build-system*)
