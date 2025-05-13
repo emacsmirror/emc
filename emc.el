@@ -1895,6 +1895,69 @@ whether EMC prints out progress messages."
   )
 
 
+(defvar emc:*help-text* "
+EMC Help
+========
+
+The main commands available in EMC are listed hereafter.  All of them
+come in a 'no-prefix' or in a 'prefix' form (using 'C-u'); the
+'no-prefix' form runs the command in a minimal form with hopefully
+useful defaults, while the 'prefix' form asks for several arguments to
+be supplied.
+
+- emc:make      : Invoke make (or nmake).
+- emc:cmake     : Invoke cmake.
+- emc:run       : Ask which 'build system' to use, what 'command' to run,
+                  and then the necessary parameters.
+- emc:setup     : Ask which 'build system' to use, and issues a 'setup'
+                  command; usually not so useful for make, unless you know
+                  there is a 'setup' target in the Makefile.
+- emc:build     : Ask which 'build system' to use, and issues a
+                  'build' command.
+- emc:install   : Ask which 'build system' to use, and issues a
+                  'install' command.
+- emc:uninstall : Ask which 'build system' to use, and issues a
+                  'uninstall' command; note that cmake needs special
+                  provisions to make this command available.
+- emc:clean     : Ask which 'build system' to use, and issues a
+                  'clean' command.
+- emc:fresh     : Ask which 'build system' to use, and issues a 'fresh'
+                  command; usually not so useful for make, unless you know
+                  there is a 'setup' target in the Makefile.
+- emc:emc       : Start an Emacs Widget UI to run EMC.
+
+Issuing emc:help or emc:? shows this help buffer.
+
+You can customize EMC by setting values for the variables under the
+tools -> emc customization section.
+"
+  "The EMC Help text dispalyed by emc:help.")
+
+
+(defun emc:help ()
+  "Display EMC basic help."
+
+  (interactive)
+
+  (switch-to-buffer "*EMC Help*")
+
+  (kill-all-local-variables)
+
+  (let ((inhibit-read-only t))
+    (erase-buffer)
+
+    (help-mode)
+
+    (insert emc:*help-text*)
+
+    (goto-char (point-min))
+    )
+  )
+
+
+(defalias 'emc:? #'emc:help "Dispaly EMC basic help.")
+
+
 ;; emc-mode
 ;; Minor mode, just to get the "EMC" menu.
 
@@ -2311,6 +2374,15 @@ the ancillary window."
 		     :notify (lambda (w &rest args)
 			       (ignore w args)
 			       (emc::exit-panel))
+		     )
+
+
+      (widget-insert "     ")
+      (widget-create 'push-button
+		     :value "Help"
+		     :notify (lambda (w &rest args)
+			       (ignore w args)
+			       (emc:help))
 		     )
       
       ;; (widget-insert "     ")
