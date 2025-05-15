@@ -257,6 +257,34 @@ See Also:
      nil)))
 
 
+(defcustom emc:*emacs-include-dir*
+  (cl-case (emc::platform-type)
+    (darwin
+     "/Applications/Emacs.app/Contents/Resources/include")
+    
+    (windows-nt
+     (concat
+      "C:\\Program Files\\Emacs\\"
+      "emacs-"
+      emacs-version
+      "\\include\\"))
+    
+     (generic-unix
+      (concat
+       "/usr/local/share/emacs/"
+       "emacs-"
+       emacs-version
+       "/include/"))
+     )
+  "Guessing the Emacs \\='include\\=' directory to handle \\='dynamic
+modules\\='.
+Unfortunately, Emacs Lisp does not expose a \\='include-dir\\='
+variable; which it should."
+  :group 'emc
+  :type 'string
+  )
+
+
 ;; Support for special `interactive' calls.
 ;; ----------------------------------------
 ;;
@@ -1309,7 +1337,7 @@ without executing it."
   (message "EMC: targets:     %S" targets)
   (message "EMC: making...")
 
-  (apply #'emc:start-making (emc::platform-type) :cmake :command cmd keys)
+  (apply #'emc:start-making (emc::platform-type) 'cmake :command cmd keys)
 
   (when wait
     (message "EMC: waiting...")
@@ -1373,7 +1401,7 @@ BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
   "Dispatch to the specialized machinery.
 
 The proper calls for the pair SYS equal to \\='windows-nt\\=' and
-BUILD-SYSTEM equal to \\=':cmake\\=' is invoked with KEYS."
+BUILD-SYSTEM equal to \\='cmake\\=' is invoked with KEYS."
   (ignore sys build-system)
   (emc::invoke-make (apply #'emc:msvc-cmake-cmd keys))
   )
@@ -1387,7 +1415,7 @@ BUILD-SYSTEM equal to \\=':cmake\\=' is invoked with KEYS."
   "Dispatch to the specialized machinery.
 
 The proper calls for the pair SYS equal to \\='generic-unix\\=' and
-BUILD-SYSTEM equal to \\=':cmake\\=' is invoked with KEYS."
+BUILD-SYSTEM equal to \\='cmake\\=' is invoked with KEYS."
   (ignore sys build-system)
   (emc::invoke-make (apply #'emc:unix-cmake-cmd keys))
   )
@@ -1401,7 +1429,7 @@ BUILD-SYSTEM equal to \\=':cmake\\=' is invoked with KEYS."
   "Dispatch to the specialized machinery.
 
 The proper calls for the pair SYS equal to \\='darwin\\=' (MacOS) and
-BUILD-SYSTEM equal to \\=':cmake\\=' is invoked with KEYS."
+BUILD-SYSTEM equal to \\='cmake\\=' is invoked with KEYS."
   (ignore sys build-system)
   (emc::invoke-make (apply #'emc:macos-cmake-cmd keys))
   )
