@@ -12,7 +12,7 @@
 ;; Summary: Invoking a C/C++ (and other) build toolchain from Emacs.
 ;;
 ;; Created: 2025-01-02
-;; Version: 2025-05-11
+;; Version: 2025-05-16
 ;;
 ;; Keywords: languages, operating systems, binary platform.
 
@@ -2121,6 +2121,10 @@ You an use the function key \\='F3\\=' (i.e., \\='PF3\\=') or the
   )
 
 
+(defvar emc::*emc-field-size* 50
+  "The default size of EMC UI field.")
+
+
 (cl-defun emc:emc (&aux (from-buffer (current-buffer)))
   "Builds a widgets window that can be used to fill in several parameters.
 
@@ -2236,12 +2240,11 @@ the ancillary window."
 		     )
 
       (widget-insert "\n")
-
       (setq makefile-widget
 	    (widget-create 'string
 			   :value "Makefile"
-			   :format "Makefile    : %v"
-			   :size 40
+			   :format "Makefile        : %v"
+			   :size emc::*emc-field-size*
 			   :notify (lambda (w &rest ignore)
 				     (ignore w ignore)
 				     (save-excursion
@@ -2255,8 +2258,9 @@ the ancillary window."
       (setq src-dir-widget
 	    (widget-create 'directory
 			   :value default-directory
-			   :format "Source dir  : %v"
-			   :size 40
+			   :format "Source dir      : %v"
+                                                              
+			   :size emc::*emc-field-size*
 			   
 			   :notify (lambda (w &rest ignore)
 				     (ignore w ignore)
@@ -2273,8 +2277,9 @@ the ancillary window."
       (setq bin-dir-widget
 	    (widget-create 'directory
 			   :value default-directory
-			   :format "Build dir   : %v"
-			   :size 40
+			   :format "Build dir       : %v"
+
+			   :size emc::*emc-field-size*
 			   
 			   :notify (lambda (w &rest ignore)
 				     (ignore w ignore)
@@ -2290,8 +2295,8 @@ the ancillary window."
       (setq install-dir-widget
 	    (widget-create 'directory
 			   :value default-directory
-			   :format "Install dir : %v"
-			   :size 40
+			   :format "Install dir     : %v"
+			   :size emc::*emc-field-size*
 			   
 			   :notify (lambda (w &rest ignore)
 				     (ignore w ignore)
@@ -2353,7 +2358,7 @@ the ancillary window."
 	    (widget-create 'string
 			   :value ""
 			   :format "Macros          : %v"
-			   :size 40
+			   :size emc::*emc-field-size*
 			   :notify (lambda (w &rest ignore)
 				     (ignore w ignore)
 				     (save-excursion
@@ -2366,7 +2371,7 @@ the ancillary window."
 	    (widget-create 'string
 			   :value ""
 			   :format "(Extra) targets : %v"
-			   :size 40
+			   :size emc::*emc-field-size*
 			   :notify (lambda (w &rest ignore)
 				     (ignore w ignore)
 				     (save-excursion
@@ -2456,5 +2461,6 @@ the ancillary window."
 ;;; Epilogue.
 
 (provide 'emc '(make cmake))
+
 
 ;;; emc.el ends here
