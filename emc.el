@@ -8,13 +8,14 @@
 
 ;; Author: Marco Antoniotti <marcoxa [at] gmail.com>
 ;; Maintainer: Marco Antoniotti <marcoxa [at] gmail.com>
+;; Package-Requires: ((delight "1.7") (emacs "29.1"))
+;; Keywords: building tools, development, deployment.
+;; URL: https://github.com/marcoxa/emc
 ;;
 ;; Summary: Invoking a C/C++ (and other) build toolchain from Emacs.
 ;;
 ;; Created: 2025-01-02
-;; Version: 2025-05-11
-;;
-;; Keywords: languages, operating systems, binary platform.
+;; Version: 2025-05-19
 
 
 ;;; Commentary:
@@ -188,7 +189,7 @@ toolchains."
   )
 
 
-(defvar emc:path (file-name-directory (or load-file-name "."))
+(defconst emc:+path+ (file-name-directory (or load-file-name "."))
   "The location EMC is loaded from.")
 
 
