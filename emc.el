@@ -1980,7 +1980,7 @@ tools -> emc customization section.
   )
 
 
-(defalias 'emc:? #'emc:help "Dispaly EMC basic help.")
+(defalias 'emc:? #'emc:help "Display EMC basic help.")
 
 
 ;; emc-mode
@@ -2214,8 +2214,12 @@ the ancillary window."
 
       ;; (widget-insert "Emacs Make Compile (EMC, or Emacs Master of Cerimonies)")
       (setq-local header-line-format (emc::header-line))
-      
+
       (widget-insert "\n")
+      (widget-insert (format "Current dir     : %S"
+                             default-directory))
+      
+      (widget-insert "\n\n")
       (widget-create 'menu-choice
 		     :tag "Build system "
 		     ;; :void ":make"
