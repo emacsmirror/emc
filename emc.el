@@ -1,20 +1,18 @@
-;;; emc --- Invoking a C/C++ (et al.) build toolchain from Emacs. -*- Mode: Emacs-Lisp; lexical-binding: t; -*-
-
-
-;;; emc.el
+;;; emc.el --- Invoking a C/C++ (et al.) build toolchain from ELisp -*- Mode: Emacs-Lisp; lexical-binding: t; -*-
 ;;;
 ;;; See the file COPYING in the top directory for copyright and
 ;;; licensing information.
 
 ;; Author: Marco Antoniotti <marcoxa [at] gmail.com>
 ;; Maintainer: Marco Antoniotti <marcoxa [at] gmail.com>
+;; Package-Requires: ((delight "1.7") (emacs "29.1"))
+;; Keywords: extensions, c, lisp, building tools, development, deployment.
+;; URL: https://github.com/marcoxa/emc
 ;;
 ;; Summary: Invoking a C/C++ (and other) build toolchain from Emacs.
 ;;
 ;; Created: 2025-01-02
-;; Version: 2025-05-16
-;;
-;; Keywords: languages, operating systems, binary platform.
+;; Version: 2025-05-19
 
 
 ;;; Commentary:
@@ -188,7 +186,7 @@ toolchains."
   )
 
 
-(defvar emc:path (file-name-directory (or load-file-name "."))
+(defconst emc:+path+ (file-name-directory (or load-file-name "."))
   "The location EMC is loaded from.")
 
 
@@ -276,8 +274,7 @@ See Also:
        emacs-version
        "/include/"))
      )
-  "Guessing the Emacs \\='include\\=' directory to handle \\='dynamic
-modules\\='.
+  "Guessing the Emacs \\='include\\=' dir to handle \\='dynamic modules\\='.
 Unfortunately, Emacs Lisp does not expose a \\='include-dir\\='
 variable; which it should."
   :group 'emc
@@ -2380,7 +2377,7 @@ the ancillary window."
 			   ))
 
       
-      (widget-insert "\n")
+      (widget-insert "\n\n")
       ;; (widget-create 'group :tag "Actual command")
       (widget-insert "Actual command:")
       (widget-insert "\n")
