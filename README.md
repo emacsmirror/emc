@@ -32,7 +32,7 @@ On Windows **EMC** assumes the installation of
 (Community -- provisions are made to handle the Enterprise or other
 versions, but they are untested).
 [`MSYS2`](https://www.msys2.org) will be added in the
-future, but is will mostly look like UNIX.
+future, but it will mostly look like UNIX.
 
 There are three main `emc` commands: `emc:run`, `emc:make`, and
 `emc:cmake`.  `emc:run` is the most generic command and allows to
