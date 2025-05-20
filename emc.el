@@ -13,7 +13,7 @@
 ;; Summary: Invoking a C/C++ (and other) build toolchain from Emacs.
 ;;
 ;; Created: 2025-01-02
-;; Version: 2025-05-19
+;; Version: 2025-05-20
 
 
 ;;; Commentary:
