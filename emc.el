@@ -5,6 +5,7 @@
 
 ;; Author: Marco Antoniotti <marcoxa [at] gmail.com>
 ;; Maintainer: Marco Antoniotti <marcoxa [at] gmail.com>
+;; SPDX-License-Identifier: MIT
 ;; Package-Requires: ((delight "1.7") (emacs "29.1"))
 ;; Keywords: extensions, c, lisp, building tools, development, deployment.
 ;; URL: https://github.com/marcoxa/emc
