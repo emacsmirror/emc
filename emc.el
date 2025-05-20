@@ -2109,7 +2109,7 @@ You an use the function key \\='F3\\=' (i.e., \\='PF3\\=') or the
   (use-local-map emc::keymap)
   ;; (message "EMC: keymap is now %s" (current-local-map))
 
-  (setq-local mode-line-format 
+  (setq-local mode-line-format
 	      (identity
 	       '(" "
 		 mode-line-buffer-identification
