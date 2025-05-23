@@ -13,7 +13,8 @@
 ;; Summary: Invoking a C/C++ (and other) build toolchain from Emacs.
 ;;
 ;; Created: 2025-01-02
-;; Version: 2025-05-20
+;; Timestamp: 2025-05-23
+;; Version: 0.42
 
 
 ;;; Commentary:
@@ -61,6 +62,9 @@
 ;; ```
 ;; on UN*X platoforms.
 ;;
+;;
+;; ### 'make'
+;;
 ;; All in all, the easiest way to use this library is to call the `emc:make'
 ;; function, which invokes the underlying build system (at the time of this
 ;; writing either 'make' or 'nmake'); e.g., the call:
@@ -99,7 +103,10 @@
 ;; ```
 ;;
 ;; as a result `compile' will do the right thing by intercepting the 'cd' in
-;; the string.
+;; the string (the directory name is actually fully expanded by EMC).
+;;
+;;
+;; ### 'cmake'
 ;;
 ;; To invoke 'cmake' the relevant function is `emc:cmake' which takes
 ;; the following "subcommands" (the '<bindir>' below is to be
@@ -112,6 +119,53 @@
 ;; 5. `clean': equivalent to 'cmake --build <bindir> -t clean'.
 ;; 5. `fresh': equivalent to 'cmake --fresh <bindir>'.
 ;;
+;; As for `emc:make`, you can invoke the `emc:cmake` command either as  
+;; `M-x emc:make` or `C-u M-x emc:cmake`.  In the first case **EMC** will
+;; assume that most parameters are already set; in the second case,
+;; **EMC** will ask for each parameter needed by the sub-command.
+;;
+;;
+;; ### Other Commands
+;;
+;; You can use the `emc:run` command which will ask you which
+;; *sub-command* to use.  Again, if you prefix it with `C-u`, it will ask
+;; you for several other variables, including the choice of *build
+;; system* (which, for the time being, is either `make`, or `cmake`).
+;;
+;; Other commands (and functions) you can use correspond to `cmake' sub
+;; commands.
+;;
+;; 1. `emc:setup`: which is equivalent to `cmake <srcdir>` issued in a
+;;    `binary` directory and to a `make setup` issued in the appropriate
+;;    directory as well.  Note that this command usually does not mean
+;;    much in a `make` based setup, unless the `Makefile` contains a
+;;    `setup` target.
+;; 2. `emc:build`: which is equivalent to `cmake --build <bindir>` and to
+;;    `make` issued in `<bindir>`; note that `make` will execute the
+;;    recipe associated to the first target.
+;; 3. `emc:install`: which is equivalent to `cmake --install <bindir>`
+;;    and to `make install` issued in `<bindir>`; note that `make` must
+;;    provide the `install` target.
+;; 4. `emc:uninstall`: which currently has no `cmake` equivalent.  To execute
+;;    this command with `cmake`, `CMakeLists.txt` must make provisions to
+;;    handle and generate the `uninstall` targets.
+;; 5. `emc:clean`: equivalent to `cmake --build <bindir> -t clean`,  and to
+;;    `make clean` issued in `<bindir>`; note that `make` must provide
+;;    the `clean` target.
+;; 5. `emc:fresh`: equivalent to `cmake --fresh <bindir>`, and to `make
+;;    fresh`.  Note that this command usually does not mean much in a
+;;    `make` based setup, unless the `Makefile` contains a `setup`
+;;    target.
+;;
+;;
+;; #### **EMC** *GUI*
+;;
+;; **EMC** also has a simple user interface that uses Emacs `widget`
+;; library.  It may simplify setting up the build system commands,
+;; especially because it shows the command before executing it.
+;;
+;; You can invoke the GUI by invoking the `emc:emc` Emacs command
+;; (`M-x emc:emc`).  Using it should be rather straightforward.
 
 
 ;;; Code:

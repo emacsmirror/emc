@@ -97,7 +97,7 @@ will result in a call to `make` such as:
 	cd foobar-build ; make -f Foobar.mk
 ```
 as a result `compile` will do the right thing by intercepting the `cd`
-in the string.
+in the string (the directory name is actually fully expanded by EMC).
 
 All commands in **EMC** can be invoked with a prefix, which will enter
 a more complex `interactive` session asking to manually fill in many
