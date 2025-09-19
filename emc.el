@@ -202,7 +202,7 @@
 		      (string-equal-ignore-case build-system "cmake"))))
 	 'cmake)
 	(t
-	 (error "EMC- error: unknown build system %S" build-system))
+	 (error "EMC: error: unknown build system %S" build-system))
 	))
 
 
@@ -247,11 +247,11 @@ toolchains."
   "The location EMC is loaded from.")
 
 
-(defcustom emc-*default-build-system* nil
+(defcustom emc-*default-build-system* 'make
   "The EMC default build system.
 
-Initially the value is NIL; the first time its value is required, it
-will be locally set in the buffer."
+When EMC is called interactively this variable will be locally set in
+the buffer."
   :group 'emc
   :type 'symbol
   :options '(make cmake)
@@ -379,12 +379,12 @@ callers."
 	  (let* ((makefile
 		  (read-parm :makefile
 			     (progn
-			       (message "EMC- 1")
+			       (message "EMC: 1")
 			       (when (or (eq build-system 'make)
 					 (and (stringp build-system)
 					      (string-equal build-system
 							    "make")))
-				 (message "EMC- 2")
+				 (message "EMC: 2")
 				 (read-file-name "Makefile: "
 						 nil
 						 "Makefile"
@@ -495,7 +495,7 @@ USE-SYSTEM-DIALOG is T, then a dialog box is used to select the
 
 Returns a directory."
   (let ((use-dialog-box use-system-dialog))
-    (when use-dialog-box (message "EMC- find a 'Makefile' in %s" directory))
+    (when use-dialog-box (message "EMC: find a 'Makefile' in %s" directory))
     (read-file-name "Makefile: " directory "Makefile" t "Makefile")))
 
 
@@ -563,7 +563,7 @@ may locally set `emc-*default-build-system*' if not set yet."
 	 )
 
     (when emc-*verbose*
-      (message "EMC- read build parms from minibuffer (%S %S)."
+      (message "EMC: read build parms from minibuffer (%S %S)."
 	       prefix-arg
 	       prefix-argument))
 
@@ -987,7 +987,7 @@ Notes:
 
 For the time being, the function is a simple wrapper to add the
 \"EMC\" prefix to the message."
-  (message "EMC- %S %S" (buffer-name cur-buffer) msg))
+  (message "EMC: %S %S" (buffer-name cur-buffer) msg))
 
 
 (defun emc--compilation-buffer-name (name-of-mode)
@@ -1021,7 +1021,7 @@ progress messages."
 	)
 
     (when verbose
-      (message "EMC- invoking %S" make-cmd))
+      (message "EMC: invoking %S" make-cmd))
     
     (prog1 (compile make-cmd)
 
@@ -1057,7 +1057,7 @@ string containing \\='MACRO=DEF\\=' definitions; TARGETS is a string of
 Makefile targets.  WAIT is a boolean telling `emc-make' whether to wait
 or not for the compilation process termination.  BUILD-SYSTEM specifies
 what type of tool is used to build result; the default is \\=':make\\='
-which works of the different known platforms using \\='make\\=' or
+which works on the different known platforms using \\='make\\=' or
 \\='nmake\\='; another experimental value is \\=':cmake\\=' which
 invokes a \\='CMake\\=' build pipeline with some assumptions (not yet
 working).  BUILD-DIR is the directory (folder) where the build
@@ -1113,7 +1113,7 @@ executing it."
   ;; Some preventive basic error checking.
 
   (unless (file-directory-p build-dir)
-    (error "EMC- error: non-existing build directory %S" build-dir))
+    (error "EMC: error: non-existing build directory %S" build-dir))
 
   ;; This is a check useful for non-interactive calls.
   
@@ -1121,17 +1121,17 @@ executing it."
 	      (file-exists-p
 	       (expand-file-name (file-name-nondirectory makefile)
 				 build-dir)))
-    (error "EMC- error: no %S in build directory %S" makefile build-dir))
+    (error "EMC: error: no %S in build directory %S" makefile build-dir))
 
 
   ;; Here we go.
 
-  (message "EMC- making with:")
-  (message "EMC- makefile:    %S" makefile)
-  (message "EMC- make-macros: %S" make-macros)
-  (message "EMC- targets:     %S" targets)
-  (message "EMC- keys:        %S" keys)
-  (message "EMC- making...")
+  (message "EMC: making with:")
+  (message "EMC: makefile:    %S" makefile)
+  (message "EMC: make-macros: %S" make-macros)
+  (message "EMC: targets:     %S" targets)
+  (message "EMC: keys:        %S" keys)
+  (message "EMC: making...")
 
   (apply #'emc-start-making (emc--platform-type) build-system
 	 :makefile makefile		; Ensure we have the right
@@ -1139,11 +1139,11 @@ executing it."
 	 keys)
 
   (when wait
-    (message "EMC- waiting...")
+    (message "EMC: waiting...")
     (while (memq emc--*compilation-process* compilation-in-progress)
       ;; Spin loop.
       (sit-for 1.0))
-    (message "EMC- done."))
+    (message "EMC: done."))
   )
 
 
@@ -1160,7 +1160,7 @@ SYS and BUILD-SYSTEM pair is passed to the generic function.   KEYS is
 ignored."
 
   (ignore keys)
-  (error "EMC- build system %S cannot be used (yet) on %S"
+  (error "EMC: build system %S cannot be used (yet) on %S"
 	 build-system
 	 sys)
   )
@@ -1203,9 +1203,9 @@ list (actually a space separated string)."
   (ignore sys build-system)
   (let ((tgts (emc--craft-make-targets command targets)))
     
-    ;; (message "EMC- craft-command: MSVC nmake: %S %S" command tgts)
+    ;; (message "EMC: craft-command: MSVC nmake: %S %S" command tgts)
     (cl-remf keys :targets)
-    ;; (message "EMC- craft-command: %S" keys)
+    ;; (message "EMC: craft-command: %S" keys)
     (apply #'emc-msvc-make-cmd :targets tgts keys)
     ))
 
@@ -1228,9 +1228,9 @@ list (actually a space separated string)."
 
   (let ((tgts (emc--craft-make-targets command targets)))
     
-    ;; (message "EMC- craft-command: MacOS make: %S %S" command tgts)
+    ;; (message "EMC: craft-command: MacOS make: %S %S" command tgts)
     (cl-remf keys :targets)
-    ;; (message "EMC- craft-command: %S" keys)
+    ;; (message "EMC: craft-command: %S" keys)
     (apply #'emc-unix-make-cmd :targets tgts keys)
     ))
 
@@ -1253,9 +1253,9 @@ targets to pass down."
 
   (let ((tgts (emc--craft-make-targets command targets)))
 
-    ;; (message "EMC- craft-command: UNX make: %S %S" command tgts)
+    ;; (message "EMC: craft-command: UNX make: %S %S" command tgts)
     (cl-remf keys :targets)
-    ;; (message "EMC- craft-command: %S" keys)
+    ;; (message "EMC: craft-command: %S" keys)
     (apply #'emc-unix-make-cmd :targets tgts keys)
     ))
 
@@ -1273,7 +1273,7 @@ SYS and BUILD-SYSTEM pair is passed to the generic function.   KEYS is
 ignored."
 
   (ignore keys)
-  (error "EMC- build system %S cannot be used (yet) on %S"
+  (error "EMC: build system %S cannot be used (yet) on %S"
 	 build-system
 	 sys)
   )
@@ -1371,34 +1371,34 @@ without executing it."
   ;; Some preventive basic error checking.
   
   (unless (file-directory-p source-dir)
-    (error "EMC- error: non-existing source directory %S" source-dir))
+    (error "EMC: error: non-existing source directory %S" source-dir))
   (unless (file-directory-p build-dir)
-    (error "EMC- error: non-existing build directory %S" build-dir))
+    (error "EMC: error: non-existing build directory %S" build-dir))
   (unless (file-directory-p install-dir)
-    (error "EMC- error: non-existing install directory %S" build-dir))
+    (error "EMC: error: non-existing install directory %S" build-dir))
 
   (unless (file-exists-p (expand-file-name "CMakeLists.txt" source-dir))
-    (error "EMC- error: no 'CMakeLists.txt' file found in\n     %s" source-dir)
+    (error "EMC: error: no 'CMakeLists.txt' file found in\n     %s" source-dir)
     )
 
   ;; Here we go.
 
-  (message "EMC- running 'cmake' command %S" cmd)
-  (message "EMC- source-dir:  %S" source-dir)
-  (message "EMC- build-dir:   %S" build-dir)
-  (message "EMC- install-dir: %S" install-dir)
-  (message "EMC- make-macros: %S" make-macros)
-  (message "EMC- targets:     %S" targets)
-  (message "EMC- making...")
+  (message "EMC: running 'cmake' command %S" cmd)
+  (message "EMC: source-dir:  %S" source-dir)
+  (message "EMC: build-dir:   %S" build-dir)
+  (message "EMC: install-dir: %S" install-dir)
+  (message "EMC: make-macros: %S" make-macros)
+  (message "EMC: targets:     %S" targets)
+  (message "EMC: making...")
 
   (apply #'emc-start-making (emc--platform-type) 'cmake :command cmd keys)
 
   (when wait
-    (message "EMC- waiting...")
+    (message "EMC: waiting...")
     (while (memq emc--*compilation-process* compilation-in-progress)
       ;; Spin loop.
       (sit-for 1.0))
-    (message "EMC- done."))
+    (message "EMC: done."))
   )
 
 
@@ -1560,13 +1560,13 @@ and BUILD-DIR are as per `emc-make'."
      (if (string-search "setup" targets)
 	 (apply #'emc-make :makefile makefile keys)
        (progn
-	 (warn "EMC- warn: 'setup' command not foreseen for 'make'")
+	 (warn "EMC: warn: 'setup' command not foreseen for 'make'")
 	 t))
      )
     
     ((cmake :cmake) (apply #'emc-cmake :setup keys))
     (t
-     (error "EMC- error: unknown build system %S" build-system))
+     (error "EMC: error: unknown build system %S" build-system))
     ))
 
 
@@ -1631,7 +1631,7 @@ and BUILD-DIR are as per `emc-make'."
     
     ((cmake :cmake) (apply #'emc-cmake :build keys))
     (t
-     (error "EMC- error: unknown build system %S" build-system))
+     (error "EMC: error: unknown build system %S" build-system))
     ))
 
 
@@ -1701,7 +1701,7 @@ and BUILD-DIR are as per `emc-make'."
     ((cmake :cmake)
      (apply #'emc-cmake :install keys))
     (t
-     (error "EMC- error: unknown build system %S" build-system))
+     (error "EMC: error: unknown build system %S" build-system))
     ))
 
 
@@ -1769,10 +1769,10 @@ and BUILD-DIR are as per `emc-make'."
        (apply #'emc-make :makefile makefile :targets targets keys)))
     
     ((cmake :cmake)
-     (warn "EMC- warning: ensure the 'CMakeLists.txt' files handle 'uninstall'")
+     (warn "EMC: warning: ensure the 'CMakeLists.txt' files handle 'uninstall'")
      (apply #'emc-cmake :uninstall keys))
     (t
-     (error "EMC- error: unknown build system %S" build-system))
+     (error "EMC: error: unknown build system %S" build-system))
     ))
 
 
@@ -1836,7 +1836,7 @@ and BUILD-DIR are as per `emc-make'."
     
     ((cmake :cmake) (apply #'emc-cmake :clean keys))
     (t
-     (error "EMC- error: unknown build system %S" build-system))
+     (error "EMC: error: unknown build system %S" build-system))
     ))
 
 
@@ -1901,14 +1901,14 @@ and BUILD-DIR are as per `emc-make'."
      (if (string-search "fresh" targets)
 	 (apply #'emc-make :makefile makefile keys)
        (progn
-	 (warn (concat "EMC- warn: 'fresh' command not foreseen for 'make'; "
+	 (warn (concat "EMC: warn: 'fresh' command not foreseen for 'make'; "
 		       "maybe you mean 'clean'?"))
 	 t))
      )
     
     ((cmake :cmake) (apply #'emc-cmake :fresh keys))
     (t
-     (error "EMC- error: unknown build system %S" build-system))
+     (error "EMC: error: unknown build system %S" build-system))
     ))
 
 
@@ -1963,7 +1963,7 @@ whether EMC prints out progress messages."
 
   (ignore build-system source-dir build-dir install-dir make-macros targets)
   
-  (message "EMC- %s %S" cmd keys)
+  (message "EMC: %s %S" cmd keys)
 
   (let ((emc-*verbose* verbose))
     (cl-ecase cmd
@@ -2161,9 +2161,9 @@ a nice keymap and look.
 You an use the function key \\='F3\\=' (i.e., \\='PF3\\=') or the
 \\='[Qq]\\=' keys to exit the EMC panel."
 
-  ;; (message "EMC- using local map %S" (keymap-lookup emc--keymap "q"))
+  ;; (message "EMC: using local map %S" (keymap-lookup emc--keymap "q"))
   (use-local-map emc--keymap)
-  ;; (message "EMC- keymap is now %s" (current-local-map))
+  ;; (message "EMC: keymap is now %s" (current-local-map))
 
   (setq-local mode-line-format
 	      (identity
@@ -2233,7 +2233,7 @@ the ancillary window."
 					     ))
 			 )
 
-		    ;; (message "EMC- %s %s %s %s"
+		    ;; (message "EMC: %s %s %s %s"
 		    ;; 	     build-system
 		    ;; 	     src-dir
 		    ;; 	     bin-dir
@@ -2252,11 +2252,11 @@ the ancillary window."
 		       (macros (widget-value make-macros-widget))
 		       )
 
-		    (message "EMC- running %s" build-system)
-		    (message "EMC- command %s" cmd)
-		    (message "EMC- source dir  : %s" src-dir)
-		    (message "EMC- build dir   : %s" bin-dir)
-		    (message "EMC- install dir : %s" install-dir)
+		    (message "EMC: running %s" build-system)
+		    (message "EMC: command %s" cmd)
+		    (message "EMC: source dir  : %s" src-dir)
+		    (message "EMC: build dir   : %s" bin-dir)
+		    (message "EMC: install dir : %s" install-dir)
 		    (emc-run cmd
 			     :build-system build-system
 			     :source-dir src-dir
@@ -2284,7 +2284,7 @@ the ancillary window."
 		     :value "make"
 		     :notify (lambda (w &rest ignore)
 			       (ignore ignore)
-			       (message "EMC- chose build system: %S"
+			       (message "EMC: chose build system: %S"
 					(widget-value w))
 			       (setq-local
 				emc--build-system-chosen
@@ -2373,7 +2373,7 @@ the ancillary window."
 		     :value "build"
 		     :notify (lambda (w &rest ignore)
 			       (ignore ignore)
-			       (message "EMC- chose build system: %S"
+			       (message "EMC: chose build system: %S"
 					(widget-value w))
 			       (setq-local
 				emc--command-chosen
@@ -2449,7 +2449,7 @@ the ancillary window."
       (widget-create 'push-button :value "Run"
 		     :notify (lambda (w &rest args)
 			       (ignore w args)
-			       (message "EMC- running %S"
+			       (message "EMC: running %S"
 					(widget-value cmd-widget))
 			       (run-cmd)
 			       ))
