@@ -1196,6 +1196,7 @@ executing it."
 	;; Spin loop.
 	(sit-for 1.0))
       (emc--msg "done."))
+    t
     ))
 
 
@@ -1615,7 +1616,7 @@ and BUILD-DIR are as per `emc-make'."
 	 (apply #'emc-make :makefile makefile keys)
        (progn
 	 (warn "EMC: warn: 'setup' command not foreseen for 'make'")
-	 t))
+	 nil))
      )
     
     ((cmake :cmake) (apply #'emc-cmake :setup keys))
@@ -2213,7 +2214,7 @@ The value is NIL if not set within the `emc-emc' function.")
   "Create the panel header line."
   (identity
    `(:propertize
-     " Emacs Make Compile (EMC, or Emacs Master of Cerimonies)"
+     " Emacs Make Compile (EMC, or Emacs Master of Ceremonies)"
      face (:weight bold))
    ))
 
@@ -2336,7 +2337,7 @@ the ancillary window."
 		  ))			; run-cmd
 	      )
 
-      ;; (widget-insert "Emacs Make Compile (EMC, or Emacs Master of Cerimonies)")
+      ;; (widget-insert "Emacs Make Compile (EMC, or Emacs Master of Ceremonies)")
       (setq-local header-line-format (emc--header-line))
 
       (widget-insert "\n")
