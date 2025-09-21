@@ -13,7 +13,7 @@
 ;; Summary: Invoking a C/C++ (and other) build toolchain from Emacs.
 ;;
 ;; Created: 2025-01-02
-;; Timestamp: 2025-06-09
+;; Timestamp: 2025-09-21
 ;; Version: 0.42
 
 
@@ -178,6 +178,50 @@
 (require 'delight)			; Only non built-in dependency.
 
 
+(defgroup emc ()
+  "The Emacs Make Compile (EMC).
+
+EMC is thin layer over the invocation of C/C++ and compiler
+toolchains."
+  :group 'tools
+  )
+
+
+(defcustom emc-*logging* nil
+  "The EMC flag used to control messaging."
+  :group 'emc
+  :type 'symbol
+  :options '(t info debug error warn nil)
+  :local t
+  )
+
+
+;; emc-msg
+;; I will switch to 'log4e' sooner or later.
+
+(defun emc--msg (fmt &rest args)
+  "Call `message' or issues an `error' or a `warn'ing.
+
+The behavior is controlled by the value of the variable
+`emc-*logging*'.  FMT is a `format' string  and ARGS are the
+arguments for `format'."
+  
+  (when emc-*logging*
+    (let* ((msg-prefix
+	    (cl-case emc-*logging*
+	      ((info t) "EMC INFO: ")
+	      (debug "EMC DEBUG: ")
+	      (error "EMC DEBUG: ")
+	      (warn "EMC DEBUG: ")
+	      ))
+	   (msg-fmt (concat msg-prefix fmt))
+	   )
+      (cl-case emc-*logging*
+	(error (apply #'error msg-fmt args))
+	(warn (apply #'warn msg-fmt args))
+	(otherwise (apply #'message msg-fmt args))))))
+
+
 (cl-deftype emc-build-system-type ()
   "The known EMC build-systems."
   '(member make cmake)			; Used to have :make :cmake.
@@ -234,20 +278,11 @@
     ))
 
 
-(defgroup emc ()
-  "The Emacs Make Compile (EMC).
-
-EMC is thin layer over the invocation of C/C++ and compiler
-toolchains."
-  :group 'tools
-  )
-
-
 (defconst emc-+path+ (file-name-directory (or load-file-name "."))
   "The location EMC is loaded from.")
 
 
-(defcustom emc-*default-build-system* 'make
+(defcustom emc-*default-build-system* nil
   "The EMC default build system.
 
 When EMC is called interactively this variable will be locally set in
@@ -324,13 +359,13 @@ See Also:
       emacs-version
       "\\include\\"))
     
-     (generic-unix
-      (concat
-       "/usr/local/share/emacs/"
-       "emacs-"
-       emacs-version
-       "/include/"))
-     )
+    (generic-unix
+     (concat
+      "/usr/local/share/emacs/"
+      "emacs-"
+      emacs-version
+      "/include/"))
+    )
   "Guessing the Emacs \\='include\\=' dir to handle \\='dynamic modules\\='.
 Unfortunately, Emacs Lisp does not expose a \\='include-dir\\='
 variable; which it should."
@@ -374,17 +409,17 @@ callers."
 		       (cl-getf defaults ',parm)
 		       ))
 		  )
-    
+      
       (if prefix-argument
 	  (let* ((makefile
 		  (read-parm :makefile
 			     (progn
-			       (message "EMC: 1")
+			       (emc--msg "1")
 			       (when (or (eq build-system 'make)
 					 (and (stringp build-system)
 					      (string-equal build-system
 							    "make")))
-				 (message "EMC: 2")
+				 (emc--msg "2")
 				 (read-file-name "Makefile: "
 						 nil
 						 "Makefile"
@@ -420,9 +455,9 @@ callers."
 		    (and makefile (list :makefile makefile))
 		    ;; (and current-prefix-arg (list :prefix current-prefix-arg))
 		    ))
-      
+	
 	;; Default is no prefix arg was given.
-      
+	
 	(list :source-dir default-directory
 	      :build-dir default-directory
 	      :install-dir default-directory
@@ -495,7 +530,9 @@ USE-SYSTEM-DIALOG is T, then a dialog box is used to select the
 
 Returns a directory."
   (let ((use-dialog-box use-system-dialog))
-    (when use-dialog-box (message "EMC: find a 'Makefile' in %s" directory))
+    (when use-dialog-box
+      (let ((emc-*logging* t))
+	(emc--msg "find a 'Makefile' in %s" directory)))
     (read-file-name "Makefile: " directory "Makefile" t "Makefile")))
 
 
@@ -526,7 +563,8 @@ See Also:
   (cond ((and emc-*default-build-system* build-system)
 	 (display-warning 'emc
 			  (format-message
-			   "changing default build system to %s."
+			   "changing default build system from %s to %s."
+			   emc-*default-build-system*
 			   build-system))
 	 (setq-local emc-*default-build-system* build-system))
 	(build-system
@@ -536,7 +574,7 @@ See Also:
 	 (setq-local emc-*default-build-system* (emc--read-build-system)))
 	))
 
-  
+
 ;;; emc--read-emc-command
 ;;; ---------------------
 
@@ -563,9 +601,10 @@ may locally set `emc-*default-build-system*' if not set yet."
 	 )
 
     (when emc-*verbose*
-      (message "EMC: read build parms from minibuffer (%S %S)."
-	       prefix-arg
-	       prefix-argument))
+      (let ((emc-*logging* t))
+	(emc--msg "read build parms from minibuffer (%S %S)."
+		  prefix-arg
+		  prefix-argument)))
 
     (cl-list* cmd :build-system build-system parms)
     ))
@@ -654,7 +693,7 @@ source, binary and installation directories that must be used in the
   :group 'emc-msvc
   :type 'string
   )
-  
+
 
 (cl-defun emc-msvc-folder (&optional (msvc-installation "Community"))
   "Return the MSVC main folder.
@@ -833,7 +872,7 @@ yields
 	 (targets-list (string-split targets nil t " "))
 	 (cmd-kwd (emc--normalize-command command))
 	 )
-	
+    
     (concat (emc--cmake-cmd cmd-kwd sd bd id)
 	    (when dry-run " -N ")
 	    (mapconcat #'(lambda (s) (concat " -t " s))
@@ -987,7 +1026,8 @@ Notes:
 
 For the time being, the function is a simple wrapper to add the
 \"EMC\" prefix to the message."
-  (message "EMC: %S %S" (buffer-name cur-buffer) msg))
+  (let ((emc-*logging* t))
+    (emc--msg "%S %S" (buffer-name cur-buffer) msg)))
 
 
 (defun emc--compilation-buffer-name (name-of-mode)
@@ -1005,7 +1045,7 @@ The variable NAME-OF-MODE is used to build the buffer name."
 	 (buffer-name))
 	(t
 	 (concat "*EMC " (downcase name-of-mode) "*"))))
-   
+
 
 (cl-defun emc--invoke-make (make-cmd &optional
 				     (max-ll emc-*max-line-length*)
@@ -1021,7 +1061,8 @@ progress messages."
 	)
 
     (when verbose
-      (message "EMC: invoking %S" make-cmd))
+      (let ((emc-*logging* t))
+	(emc--msg "invoking %S" make-cmd)))
     
     (prog1 (compile make-cmd)
 
@@ -1091,6 +1132,10 @@ executing it."
 	     "build system is '%s', but it should be 'make'")
 
   ;; Ensure we have a proper Makefile.
+  (emc--msg "emc-make: %s" keys)
+  (emc--msg "emc-make: interactively %s %s"
+	    (called-interactively-p 'any)
+	    current-prefix-arg)
   
   (when (and (called-interactively-p 'any) (null current-prefix-arg))
     ;; The function was called interactively but without the "full"
@@ -1121,30 +1166,37 @@ executing it."
 	      (file-exists-p
 	       (expand-file-name (file-name-nondirectory makefile)
 				 build-dir)))
-    (error "EMC: error: no %S in build directory %S" makefile build-dir))
+
+    (error (concat "EMC: error: no %S in build directory %S"
+		   "\nEMC: error: try calling the command with a prefix,"
+		   "\nEMC: error: or rhe function with different arguments"
+		   )
+	   makefile
+	   build-dir))
 
 
   ;; Here we go.
 
-  (message "EMC: making with:")
-  (message "EMC: makefile:    %S" makefile)
-  (message "EMC: make-macros: %S" make-macros)
-  (message "EMC: targets:     %S" targets)
-  (message "EMC: keys:        %S" keys)
-  (message "EMC: making...")
+  (let ((emc-*logging* t))
+    (emc--msg "making with:")
+    (emc--msg "makefile:    %S" makefile)
+    (emc--msg "make-macros: %S" make-macros)
+    (emc--msg "targets:     %S" targets)
+    (emc--msg "keys:        %S" keys)
+    (emc--msg "making...")
 
-  (apply #'emc-start-making (emc--platform-type) build-system
-	 :makefile makefile		; Ensure we have the right
+    (apply #'emc-start-making (emc--platform-type) build-system
+	   :makefile makefile		; Ensure we have the right
 					; makefile.
-	 keys)
+	   keys)
 
-  (when wait
-    (message "EMC: waiting...")
-    (while (memq emc--*compilation-process* compilation-in-progress)
-      ;; Spin loop.
-      (sit-for 1.0))
-    (message "EMC: done."))
-  )
+    (when wait
+      (emc--msg "waiting...")
+      (while (memq emc--*compilation-process* compilation-in-progress)
+	;; Spin loop.
+	(sit-for 1.0))
+      (emc--msg "done."))
+    ))
 
 
 ;; make/nmake `emc-craft-command' methods.
@@ -1185,7 +1237,7 @@ initial target list (actually a space separated string)."
 	   (concat cmd-target " " targets))))
   )
 
-    
+
 (cl-defmethod emc-craft-command ((sys (eql 'windows-nt))
 				 (build-system (eql 'make))
 				 &rest keys
@@ -1203,9 +1255,9 @@ list (actually a space separated string)."
   (ignore sys build-system)
   (let ((tgts (emc--craft-make-targets command targets)))
     
-    ;; (message "EMC: craft-command: MSVC nmake: %S %S" command tgts)
+    ;; (emc--msg "craft-command: MSVC nmake: %S %S" command tgts)
     (cl-remf keys :targets)
-    ;; (message "EMC: craft-command: %S" keys)
+    ;; (emc--msg "craft-command: %S" keys)
     (apply #'emc-msvc-make-cmd :targets tgts keys)
     ))
 
@@ -1228,9 +1280,9 @@ list (actually a space separated string)."
 
   (let ((tgts (emc--craft-make-targets command targets)))
     
-    ;; (message "EMC: craft-command: MacOS make: %S %S" command tgts)
+    ;; (emc--msg "craft-command: MacOS make: %S %S" command tgts)
     (cl-remf keys :targets)
-    ;; (message "EMC: craft-command: %S" keys)
+    ;; (emc--msg "craft-command: %S" keys)
     (apply #'emc-unix-make-cmd :targets tgts keys)
     ))
 
@@ -1253,9 +1305,9 @@ targets to pass down."
 
   (let ((tgts (emc--craft-make-targets command targets)))
 
-    ;; (message "EMC: craft-command: UNX make: %S %S" command tgts)
+    ;; (emc--msg "craft-command: UNX make: %S %S" command tgts)
     (cl-remf keys :targets)
-    ;; (message "EMC: craft-command: %S" keys)
+    ;; (emc--msg "craft-command: %S" keys)
     (apply #'emc-unix-make-cmd :targets tgts keys)
     ))
 
@@ -1381,25 +1433,27 @@ without executing it."
     (error "EMC: error: no 'CMakeLists.txt' file found in\n     %s" source-dir)
     )
 
+  
   ;; Here we go.
 
-  (message "EMC: running 'cmake' command %S" cmd)
-  (message "EMC: source-dir:  %S" source-dir)
-  (message "EMC: build-dir:   %S" build-dir)
-  (message "EMC: install-dir: %S" install-dir)
-  (message "EMC: make-macros: %S" make-macros)
-  (message "EMC: targets:     %S" targets)
-  (message "EMC: making...")
+  (let ((emc-*logging* t))
+    (emc--msg "running 'cmake' command %S" cmd)
+    (emc--msg "source-dir:  %S" source-dir)
+    (emc--msg "build-dir:   %S" build-dir)
+    (emc--msg "install-dir: %S" install-dir)
+    (emc--msg "make-macros: %S" make-macros)
+    (emc--msg "targets:     %S" targets)
+    (emc--msg "making...")
 
-  (apply #'emc-start-making (emc--platform-type) 'cmake :command cmd keys)
+    (apply #'emc-start-making (emc--platform-type) 'cmake :command cmd keys)
 
-  (when wait
-    (message "EMC: waiting...")
-    (while (memq emc--*compilation-process* compilation-in-progress)
-      ;; Spin loop.
-      (sit-for 1.0))
-    (message "EMC: done."))
-  )
+    (when wait
+      (emc--msg "waiting...")
+      (while (memq emc--*compilation-process* compilation-in-progress)
+	;; Spin loop.
+	(sit-for 1.0))
+      (emc--msg "done."))
+    ))
 
 
 (cl-defmethod emc-craft-command ((sys (eql 'windows-nt))
@@ -1546,7 +1600,7 @@ and BUILD-DIR are as per `emc-make'."
      (when (and (called-interactively-p 'any) (null current-prefix-arg))
        ;; The function was called interactivle but without the "full"
        ;; reading of keyword parameters.
-    
+       
        (unless (or (file-exists-p makefile)
 		   (file-exists-p
 		    (expand-file-name (file-name-nondirectory makefile)
@@ -1556,7 +1610,7 @@ and BUILD-DIR are as per `emc-make'."
 	       ;; (read-file-name "Makefile: " nil "Makefile" t "Makefile")
 	       )
 	 ))
-       
+     
      (if (string-search "setup" targets)
 	 (apply #'emc-make :makefile makefile keys)
        (progn
@@ -1610,6 +1664,11 @@ and BUILD-DIR are as per `emc-make'."
   
   (ignore makefile make-macros targets wait build-dir source-dir)
 
+  (emc--msg "emc-build: %s" keys)
+  (emc--msg "emc-build: interactively %s %s"
+	    (called-interactively-p 'any)
+	    current-prefix-arg)
+  
   (cl-case (emc--normalize-build-system build-system)
     ((make :make)
 
@@ -1675,6 +1734,12 @@ and BUILD-DIR are as per `emc-make'."
   
   (ignore makefile make-macros targets wait install-dir build-dir)
 
+  (emc--msg "emc-install: %s" keys)
+  (emc--msg "emc-install: interactively %s %s"
+	    (called-interactively-p 'any)
+	    current-prefix-arg)
+
+  
   (cl-case (emc--normalize-build-system build-system)
     ((:make make)
 
@@ -1808,7 +1873,7 @@ and BUILD-DIR are as per `emc-make'."
 		      :build-dir default-directory
 		      )))
      ))
-    
+  
   (ignore makefile make-macros targets wait build-dir)
 
   (cl-case (emc--normalize-build-system build-system)
@@ -1827,7 +1892,7 @@ and BUILD-DIR are as per `emc-make'."
 	       ;; (read-file-name "Makefile: " nil "Makefile" t "Makefile")
 	       )
 	 ))
-	 
+     
      (let ((targets (if (string-equal-ignore-case "clean" targets)
 			targets
 		      (concat "clean " targets)))
@@ -1887,7 +1952,7 @@ and BUILD-DIR are as per `emc-make'."
      (when (and (called-interactively-p 'any) (null current-prefix-arg))
        ;; The function was called interactivle but without the "full"
        ;; reading of keyword parameters.
-    
+       
        (unless (or (file-exists-p makefile)
 		   (file-exists-p
 		    (expand-file-name (file-name-nondirectory makefile)
@@ -1940,7 +2005,8 @@ whether EMC prints out progress messages."
   
   (interactive
    (let ((build-system (emc--read-ensure-build-system)))
-     (cl-list* :build-system build-system
+     (cl-list* (emc--read-cmd)
+	       :build-system build-system
 	       (emc--read-command-parms
 		current-prefix-arg
 		build-system
@@ -1963,7 +2029,7 @@ whether EMC prints out progress messages."
 
   (ignore build-system source-dir build-dir install-dir make-macros targets)
   
-  (message "EMC: %s %S" cmd keys)
+  (emc--msg "emc-run: %s %S" cmd keys)
 
   (let ((emc-*verbose* verbose))
     (cl-ecase cmd
@@ -2161,9 +2227,9 @@ a nice keymap and look.
 You an use the function key \\='F3\\=' (i.e., \\='PF3\\=') or the
 \\='[Qq]\\=' keys to exit the EMC panel."
 
-  ;; (message "EMC: using local map %S" (keymap-lookup emc--keymap "q"))
+  ;; (emc--msg "using local map %S" (keymap-lookup emc--keymap "q"))
   (use-local-map emc--keymap)
-  ;; (message "EMC: keymap is now %s" (current-local-map))
+  ;; (emc--msg "keymap is now %s" (current-local-map))
 
   (setq-local mode-line-format
 	      (identity
@@ -2186,7 +2252,7 @@ The window is popped up and the command that will be run is shown in
 the ancillary window."
 
   (interactive)
- 
+  
   (switch-to-buffer "*EMC Interface*")
 
   (kill-all-local-variables)
@@ -2233,7 +2299,7 @@ the ancillary window."
 					     ))
 			 )
 
-		    ;; (message "EMC: %s %s %s %s"
+		    ;; (emc--msg "%s %s %s %s"
 		    ;; 	     build-system
 		    ;; 	     src-dir
 		    ;; 	     bin-dir
@@ -2252,11 +2318,12 @@ the ancillary window."
 		       (macros (widget-value make-macros-widget))
 		       )
 
-		    (message "EMC: running %s" build-system)
-		    (message "EMC: command %s" cmd)
-		    (message "EMC: source dir  : %s" src-dir)
-		    (message "EMC: build dir   : %s" bin-dir)
-		    (message "EMC: install dir : %s" install-dir)
+		  (let ((emc-*logging* t))
+		    (emc--msg "running %s" build-system)
+		    (emc--msg "command %s" cmd)
+		    (emc--msg "source dir  : %s" src-dir)
+		    (emc--msg "build dir   : %s" bin-dir)
+		    (emc--msg "install dir : %s" install-dir)
 		    (emc-run cmd
 			     :build-system build-system
 			     :source-dir src-dir
@@ -2265,8 +2332,8 @@ the ancillary window."
 			     :make-macros macros
 			     :makefile makefile-name
 			     :targets targets
-			     )
-		    ))			; run-cmd
+			     ))
+		  ))			; run-cmd
 	      )
 
       ;; (widget-insert "Emacs Make Compile (EMC, or Emacs Master of Cerimonies)")
@@ -2284,8 +2351,8 @@ the ancillary window."
 		     :value "make"
 		     :notify (lambda (w &rest ignore)
 			       (ignore ignore)
-			       (message "EMC: chose build system: %S"
-					(widget-value w))
+			       (emc--msg "chose build system: %S"
+					 (widget-value w))
 			       (setq-local
 				emc--build-system-chosen
 				(emc--normalize-to-symbol (widget-value w)))
@@ -2317,7 +2384,7 @@ the ancillary window."
 	    (widget-create 'directory
 			   :value default-directory
 			   :format "Source dir      : %v"
-                                                              
+                           
 			   :size emc--*emc-field-size*
 			   
 			   :notify (lambda (w &rest ignore)
@@ -2331,7 +2398,7 @@ the ancillary window."
 			   "The directory where the 'source' is found."
 			   ))
       (widget-insert "\n")
-		     
+      
       (setq bin-dir-widget
 	    (widget-create 'directory
 			   :value default-directory
@@ -2373,8 +2440,8 @@ the ancillary window."
 		     :value "build"
 		     :notify (lambda (w &rest ignore)
 			       (ignore ignore)
-			       (message "EMC: chose build system: %S"
-					(widget-value w))
+			       (emc--msg "chose build system: %S"
+					 (widget-value w))
 			       (setq-local
 				emc--command-chosen
 				(emc--normalize-to-symbol (widget-value w)))
@@ -2394,13 +2461,13 @@ the ancillary window."
 					   "installation machinery."))
 		     '(choice-item :tag "uninstall" :value "uninstall"
 				   :help-echo
-				    (concat "Invokes the build system "
-					    "uninstallation machinery. "
-					    "Note that 'cmake' "
-					    "requires  special "
-					    "provisions to make the "
-					    "'uninstall' command available."))
-				    
+				   (concat "Invokes the build system "
+					   "uninstallation machinery. "
+					   "Note that 'cmake' "
+					   "requires  special "
+					   "provisions to make the "
+					   "'uninstall' command available."))
+		     
 		     '(choice-item :tag "clean" :value "clean"
 				   :help-echo "Invokes the cleanup machinery.")
 		     '(choice-item :tag "fresh" :value "fresh"
@@ -2449,8 +2516,8 @@ the ancillary window."
       (widget-create 'push-button :value "Run"
 		     :notify (lambda (w &rest args)
 			       (ignore w args)
-			       (message "EMC: running %S"
-					(widget-value cmd-widget))
+			       (emc--msg "running %S"
+					 (widget-value cmd-widget))
 			       (run-cmd)
 			       ))
       (widget-insert "     ")
