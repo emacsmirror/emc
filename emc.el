@@ -1083,7 +1083,7 @@ progress messages."
                           (targets "")
 			  (dry-run nil)
 			  (wait nil)
-			  (build-system emc-*default-build-system*)
+			  (build-system (or emc-*default-build-system* 'make))
 			  (build-dir default-directory)
 			  (source-dir default-directory)
 			  (install-dir default-directory)
