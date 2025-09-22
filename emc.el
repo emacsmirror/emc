@@ -2349,7 +2349,7 @@ the ancillary window."
 		     :tag "Build system "
 		     ;; :void ":make"
 		     :help-echo "Choose a build system"
-		     :value "make"
+		     :value " "
 		     :notify (lambda (w &rest ignore)
 			       (ignore ignore)
 			       (emc--msg "chose build system: %S"
