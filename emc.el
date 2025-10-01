@@ -13,7 +13,7 @@
 ;; Summary: Invoking a C/C++ (and other) build toolchain from Emacs.
 ;;
 ;; Created: 2025-01-02
-;; Timestamp: 2025-09-21
+;; Timestamp: 2025-10-01
 ;; Version: 0.42
 
 
@@ -414,12 +414,12 @@ callers."
 	  (let* ((makefile
 		  (read-parm :makefile
 			     (progn
-			       (emc--msg "1")
+			       ;; (emc--msg "1")
 			       (when (or (eq build-system 'make)
 					 (and (stringp build-system)
 					      (string-equal build-system
 							    "make")))
-				 (emc--msg "2")
+				 ;; (emc--msg "2")
 				 (read-file-name "Makefile: "
 						 nil
 						 "Makefile"
@@ -442,7 +442,9 @@ callers."
 			       "Install directory: "))))
 		 (macros
 		  (read-parm :make-macros
-			     (read-string "Macros: " nil nil "")))
+			     ;; (read-string "Macros: " nil nil "")
+                             (emc--read-macro-defs)
+                             ))
 		 (targets
 		  (read-parm :targets
 			     (read-string "Targets: " nil nil "")))
@@ -461,7 +463,7 @@ callers."
 	(list :source-dir default-directory
 	      :build-dir default-directory
 	      :install-dir default-directory
-	      :make-macros ""
+	      :make-macros ()
 	      :targets ""
 	      :makefile "Makefile"
 	      ;; :prefix current-prefix-arg
@@ -543,6 +545,38 @@ PROMPT is passed to `read-string'.  ARGS is ignored.
 Returns a string."
   (ignore args)
   (read-string prompt))
+
+
+(cl-defun emc--read-macro-defs (&optional do-not-ask)
+  "Read \\='make\\=' style macro definitions from the minibuffer.
+
+If DO-NOT-ASK is non NIL (default is NIL) the function proceeds to read
+the definitions otherwise a confirmation is asked wheter to proceed.
+
+The function asks for a macro name and then for a value.  Responding
+with RET when asked for the macro name ends the interaction and makes
+the function return.
+
+The function returns NIL or a list of pairs \\='(<macro> <value>)\\='.
+<macro> is a normal string and <value> is a string produced by
+`shell-quote-argument'."
+  
+  (when (or do-not-ask (y-or-n-p "Define or override Makefile macros?"))
+    (cl-loop for m = (read-string "Macro: " nil nil "" t)
+             while (not (string-empty-p m))
+             collect (list m
+                           (shell-quote-argument
+                            (read-string "= " nil nil "" t))))))
+
+(cl-defun emc--macro-defs-string (mdl)
+  "Create a string of a list of \\='<macro>=<value>\\=' definitions.
+
+MDL is a (possibly empty) list of pairs \\='(<macro> <value>)\\='.
+The end result may be the empty string or a string of definitions
+prepended by a space."
+  (cl-loop for (m d) in mdl
+           collect (format " %s=%S" m d) into ms
+           finally (cl-return (apply #'concat ms))))
 
 
 ;;; emc--read-ensure-build-system
@@ -732,10 +766,11 @@ The web link is from 2025-01-03.  It may need some tweaking."
      ((:vcvars-bat msvc-vcvarsall-bat) "vcvars64.bat")
      (build-dir default-directory bd-p)
      (makefile "Makefile" makefile-p)
-     (make-macros "" make-macros-p)
+     (make-macros () make-macros-p)
      (nologo t)
      (targets "")
      ;; (dry-run nil)
+     (make-flags "")
      &allow-other-keys)
   "Return the \\='nmake\\=' command (a string) to execute.
 
@@ -743,11 +778,13 @@ The \\='nmake\\=' command is prepended by the necessary MSVC setup done
 by `emc-msc-vcvarsall-cmd'.  The variables :INSTALLATION (keyword
 variable MSVC-INSTALLATION) and :VCVARS-BAT (keyword variable
 MSVC-VCVARS-BAT) are passed to `emc-msc-vcvarsall-cmd'; MAKE-MACROS is a
-string containing MACRO=DEF definitions; NOLOGO specifies whether or not
-to pass the \\='/NOLOGO\\=' flag to \\='nmake\\='; finally TARGETS is a
-string of makefile targets.  Finally, BUILD-DIR contains the folder
-where \\='nmake\\=' will be run.  DRY-RUN runs the \\='nmake\\=' command
-without executing it."
+list containing \\='(MACRO DEF)\\=' definitions, which will eventually
+be transformed in \\='MACRO=DEF\\=' arguments for \\='nmake\\='; NOLOGO
+specifies whether or not to pass the \\='/NOLOGO\\=' flag to
+\\='nmake\\='; TARGETS is a string of makefile targets and MAKE-FLAGS is
+a string that contains other \\='nmake\\=' flags.  Finally, BUILD-DIR
+contains the folder where \\='nmake\\=' will be run.  DRY-RUN runs the
+\\='nmake\\=' command without executing it."
 
   (concat (if bd-p (concat "cd " build-dir " & ") "") ; Cf., `compile'.
 
@@ -757,9 +794,11 @@ without executing it."
           " > nul )"  ; To suppress the logo from 'msvc-vcvarsall-bat'.
           " & "
           "nmake "
+          make-flags
           (when nologo "/NOLOGO ")
           (when makefile-p (format "/F %s " (shell-quote-argument makefile)))
-          (when make-macros-p (concat (shell-quote-argument make-macros) " "))
+          ;; (when make-macros-p (concat (shell-quote-argument make-macros) " "))
+          (when make-macros-p (concat (emc--macro-defs-string make-macros) " "))
 	  ;; (when dry-run "-n ")
           targets)
   )
@@ -824,18 +863,19 @@ runs the \\='cmake\\=' command without executing it."
   "Return the \\='make\\=' command (a string) to execute.
 
 MAKEFILE is the \\='Makefile\\=' to pass to \\='make\\=' via the
-\\='-f\\=' flag; MAKE-MACROS is a string containing \\='MACRO=DEF\\='
-definitions; TARGETS is a string of Makefile targets.  BUILD-DIR is the
-folder where \\='make\\=' will be invoked.  DRY-RUN runs the
-\\='cmake\\=' command without executing it."
+\\='-f\\=' flag; MAKE-MACROS is a list containing \\='(MACRO DEF)\\='
+definitions, which will eventually be transformed in \\='MACRO=DEF\\='
+arguments for \\='nmake\\='; TARGETS is a string of Makefile targets.
+BUILD-DIR is the folder where \\='make\\=' will be invoked.  DRY-RUN
+runs the \\='cmake\\=' command without executing it."
 
   (concat (if bd-p (concat "cd " build-dir " ; ") "")
 	  "make "
           (when (and makefile-p (not (string-empty-p makefile)))
 	    ;; (format "-f %s " (shell-quote-argument makefile))
 	    (format "-f %s " makefile))
-          (when (and make-macros-p (not (string-empty-p make-macros)))
-	    (concat (shell-quote-argument make-macros) " "))
+          (when (and make-macros-p (not (null make-macros)))
+	    (concat (emc--macro-defs-string make-macros) " "))
 	  (when dry-run "-n ")
           targets)
   )
@@ -888,9 +928,9 @@ yields
   "Return the \\='make\\=' command (a string) to execute.
 
 MAKEFILE is the \\='Makefile\\=' to pass to \\='make\\=' via the
-\\='-f\\=' flag; MAKE-MACROS is a string containing
-\\='MACRO=DEF\\=' definitions; TARGETS is a string of Makefile
-targets.
+\\='-f\\=' flag; MAKE-MACROS is a list containing \\='(MACRO DEF)\\='
+definitions, which will eventually be transformed in \\='MACRO=DEF\\='
+arguments for \\='make\\='; TARGETS is a string of Makefile targets.
 
 This function is essentially an alias for `emc-unix-make-cmd'.
 The variable KEYS collects the arguments to pass to the latter
@@ -1079,7 +1119,7 @@ progress messages."
 (cl-defun emc-make (&rest keys
                           &key
                           (makefile "Makefile")
-                          (make-macros "")
+                          (make-macros ())
                           (targets "")
 			  (dry-run nil)
 			  (wait nil)
@@ -1093,16 +1133,17 @@ progress messages."
 
 KEYS contains the keyword arguments passed to the specialized
 `emc-X-make-cmd' functions via `emc-start-making'; MAKEFILE is the name
-of the makefile to use (defaults to \"Makefile\"); MAKE-MACROS is a
-string containing \\='MACRO=DEF\\=' definitions; TARGETS is a string of
-Makefile targets.  WAIT is a boolean telling `emc-make' whether to wait
-or not for the compilation process termination.  BUILD-SYSTEM specifies
+of the makefile to use (defaults to \"Makefile\"); MAKE-MACROS is a list
+containing \\='(MACRO DEF)\\=' definitions, which will eventually be
+transformed in \\='MACRO=DEF\\=' arguments for the uderlying
+BUILD-SYSTEM.  WAIT is a boolean telling `emc-make' whether to wait or
+not for the compilation process termination.  BUILD-SYSTEM specifies
 what type of tool is used to build result; the default is \\=':make\\='
 which works on the different known platforms using \\='make\\=' or
 \\='nmake\\='; another experimental value is \\=':cmake\\=' which
 invokes a \\='CMake\\=' build pipeline with some assumptions (not yet
-working).  BUILD-DIR is the directory (folder) where the build
-system will be invoked. DRY-RUN runs the \\='cmake\\=' command without
+working).  BUILD-DIR is the directory (folder) where the build system
+will be invoked. DRY-RUN runs the \\='cmake\\=' command without
 executing it."
 
   (interactive
@@ -1117,7 +1158,7 @@ executing it."
 					:dry-run
 					:targets)
 				      (list :makefile "Makefile"
-					    :make-macros ""
+					    :make-macros ()
 					    :targets ""
 					    :build-dir default-directory
 					    :source-dir default-directory
@@ -1378,7 +1419,7 @@ BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
 
 (cl-defun emc-cmake (cmd &rest keys
                          &key
-                         (make-macros "")
+                         (make-macros ())
                          (targets "")
 			 (dry-run nil)
 			 (wait nil)
@@ -1391,13 +1432,14 @@ BUILD-SYSTEM equal to \\=':make\\=' is invoked with KEYS."
 CMD is the \\='cmake\\=' subcommand to invoke (e.g., \\='build\\=' or
 \\='install\\=').  KEYS contains the keyword arguments passed to the
 specialized `emc-X-cmake-cmd' functions via `emc-start-making';
-MAKE-MACROS is a string containing \\='MACRO=DEF\\=' definitions;
-TARGETS is a string of Makefile targets.  WAIT is a boolean telling
-`emc-cmake' whether to wait or not for the compilation process
-termination.  Finally, SOURCE-DIR is the directory (folder) where the
-project resides, while BUILD-DIR is the directory (folder) where the
-build system will be invoked.  DRY-RUN runs the \\='cmake\\=' command
-without executing it."
+MAKE-MACROS is a list containing \\='(MACRO DEF)\\=' definitions, which
+will eventually be transformed in \\='MACRO=DEF\\=' arguments for
+\\='cmake\\='; TARGETS is a string of Makefile targets.  WAIT is a
+boolean telling `emc-cmake' whether to wait or not for the compilation
+process termination.  Finally, SOURCE-DIR is the directory (folder)
+where the project resides, while BUILD-DIR is the directory (folder)
+where the build system will be invoked.  DRY-RUN runs the \\='cmake\\='
+command without executing it."
 
   (interactive
    (cl-list* (emc--read-cmd)
@@ -1410,7 +1452,7 @@ without executing it."
 					:make-macros
 					:dry-run
 					:targets)
-				      (list :make-macros ""
+				      (list :make-macros ()
 					    :targets ""
 					    :build-dir default-directory
 					    :source-dir default-directory
@@ -1557,7 +1599,7 @@ BUILD-SYSTEM equal to \\='cmake\\=' is invoked with KEYS."
 (cl-defun emc-setup (&rest keys
                            &key
                            (makefile "Makefile")
-                           (make-macros "")
+                           (make-macros ())
                            (targets "")
 			   (wait nil)
 			   (build-system emc-*default-build-system*)
@@ -1584,7 +1626,7 @@ and BUILD-DIR are as per `emc-make'."
 		  :make-macros
 		  :targets)
 		(list :makefile "Makefile"
-		      :make-macros ""
+		      :make-macros ()
 		      :targets ""
 		      :build-dir default-directory
 		      :source-dir default-directory
@@ -1628,7 +1670,7 @@ and BUILD-DIR are as per `emc-make'."
 (cl-defun emc-build (&rest keys
                            &key
                            (makefile "Makefile")
-                           (make-macros "")
+                           (make-macros ())
                            (targets "")
 			   (wait nil)
 			   (build-system emc-*default-build-system*)
@@ -1656,7 +1698,7 @@ and BUILD-DIR are as per `emc-make'."
 		  :make-macros
 		  :targets)
 		(list :makefile "Makefile"
-		      :make-macros ""
+		      :make-macros ()
 		      :targets ""
 		      :build-dir default-directory
 		      :source-dir default-directory
@@ -1698,7 +1740,7 @@ and BUILD-DIR are as per `emc-make'."
 (cl-defun emc-install (&rest keys
                              &key
                              (makefile "Makefile")
-                             (make-macros "")
+                             (make-macros ())
                              (targets "install")
 			     (wait nil)
 			     (build-system :make)
@@ -1725,7 +1767,7 @@ and BUILD-DIR are as per `emc-make'."
 		  :install-dir
 		  )
 		(list :makefile "Makefile"
-		      :make-macros ""
+		      :make-macros ()
 		      :targets ""
 		      :build-dir default-directory
 		      :install-dir default-directory
@@ -1774,7 +1816,7 @@ and BUILD-DIR are as per `emc-make'."
 (cl-defun emc-uninstall (&rest keys
                                &key
                                (makefile "Makefile")
-                               (make-macros "")
+                               (make-macros ())
                                (targets "uninstall")
 			       (wait nil)
 			       (build-system emc-*default-build-system*)
@@ -1801,7 +1843,7 @@ and BUILD-DIR are as per `emc-make'."
 		  :install-dir
 		  )
 		(list :makefile "Makefile"
-		      :make-macros ""
+		      :make-macros ()
 		      :targets ""
 		      :build-dir default-directory
 		      :install-dir default-directory
@@ -1845,7 +1887,7 @@ and BUILD-DIR are as per `emc-make'."
 (cl-defun emc-clean (&rest keys
                            &key
                            (makefile "Makefile")
-                           (make-macros "")
+                           (make-macros ())
                            (targets "clean")
 			   (wait nil)
 			   (build-system emc-*default-build-system*)
@@ -1869,7 +1911,7 @@ and BUILD-DIR are as per `emc-make'."
 		'(:makefile
 		  )
 		(list :makefile "Makefile"
-		      :make-macros ""
+		      :make-macros ()
 		      :targets "clean"
 		      :build-dir default-directory
 		      )))
@@ -1909,7 +1951,7 @@ and BUILD-DIR are as per `emc-make'."
 (cl-defun emc-fresh (&rest keys
                            &key
                            (makefile "Makefile")
-                           (make-macros "")
+                           (make-macros ())
                            (targets "clean")
 			   (wait nil)
 			   (build-system emc-*default-build-system*)
@@ -1937,7 +1979,7 @@ and BUILD-DIR are as per `emc-make'."
 		  :targets
 		  )
 		(list :makefile "Makefile"
-		      :make-macros ""
+		      :make-macros ()
 		      :targets "clean"
 		      :build-system emc-*default-build-system*
 		      :build-dir default-directory
@@ -1988,7 +2030,7 @@ and BUILD-DIR are as per `emc-make'."
 		       (source-dir default-directory)
 		       (build-dir default-directory)
 		       (install-dir default-directory)
-		       (make-macros "")
+		       (make-macros ())
 		       (targets "")
 		       (verbose emc-*verbose*)
 		       &allow-other-keys)
@@ -1998,11 +2040,13 @@ CMD is the main subcommand to execute (e.g., \\='build\\=' or
 \\'clean\\=').  BUILD-SYSTEM is the kind of toolchain to use (for the
 time being \\='make\\=', the default, or \\='cmake\\=').  BUILD-DIR,
 SOURCE-DIR, and INSTALL-DIR, defaulting to `default-directory' have the
-usual meaning.  MACROS is a string of \"make like macro\" definitions.
-TARGETS is a string of \"make tartgets\" (space separated) to be passed
-to \\='make\\=' and \\='cmake\\='.  Finally, KEYS, collects all the
-keyword parameters passed as arguments to `emc-run'.  VERBOSE controls
-whether EMC prints out progress messages."
+usual meaning.  MAKE-MACROS is a list containing \\='(MACRO DEF)\\='
+definitions, which will eventually be transformed in \\='MACRO=DEF\\='
+arguments for BUILD-SYSTEM.  TARGETS is a string of \"make
+tartgets\" (space separated) to be passed to \\='make\\=' and
+\\='cmake\\='.  Finally, KEYS, collects all the keyword parameters
+passed as arguments to `emc-run'.  VERBOSE controls whether EMC prints
+out progress messages."
   
   (interactive
    (let ((build-system (emc--read-ensure-build-system)))
@@ -2019,7 +2063,7 @@ whether EMC prints out progress messages."
 		  :targets
 		  )
 		(list :makefile "Makefile"
-		      :make-macros ""
+		      :make-macros ()
 		      :targets ""
 		      :source-dir default-directory
 		      :build-dir default-directory
