@@ -13,7 +13,7 @@
 ;; Summary: Invoking a C/C++ (and other) build toolchain from Emacs.
 ;;
 ;; Created: 2025-01-02
-;; Timestamp: 2025-10-01
+;; Timestamp: 2025-10-14
 ;; Version: 0.42
 
 
@@ -564,9 +564,11 @@ The function returns NIL or a list of pairs \\='(<macro> <value>)\\='.
   (when (or do-not-ask (y-or-n-p "Define or override Makefile macros?"))
     (cl-loop for m = (read-string "Macro: " nil nil "" t)
              while (not (string-empty-p m))
-             collect (list m
-                           (shell-quote-argument
-                            (read-string "= " nil nil "" t))))))
+             append (let ((def (read-string "= " nil nil "" t)))
+		      (if (string-empty-p def) ; Must check.
+			  (list m def)
+			(list m (shell-quote-argument def)))))))
+
 
 (cl-defun emc--macro-defs-string (mdl)
   "Create a string of a list of \\='<macro>=<value>\\=' definitions.
@@ -574,7 +576,7 @@ The function returns NIL or a list of pairs \\='(<macro> <value>)\\='.
 MDL is a (possibly empty) list of pairs \\='(<macro> <value>)\\='.
 The end result may be the empty string or a string of definitions
 prepended by a space."
-  (cl-loop for (m d) in mdl
+  (cl-loop for (m d) on mdl by #'cddr
            collect (format " %s=%S" m d) into ms
            finally (cl-return (apply #'concat ms))))
 
@@ -798,7 +800,8 @@ contains the folder where \\='nmake\\=' will be run.  DRY-RUN runs the
           (when nologo "/NOLOGO ")
           (when makefile-p (format "/F %s " (shell-quote-argument makefile)))
           ;; (when make-macros-p (concat (shell-quote-argument make-macros) " "))
-          (when make-macros-p (concat (emc--macro-defs-string make-macros) " "))
+          (when (and make-macros-p (not (null make-macros)))
+	    (concat (emc--macro-defs-string make-macros) " "))
 	  ;; (when dry-run "-n ")
           targets)
   )
@@ -813,7 +816,7 @@ contains the folder where \\='nmake\\=' will be run.  DRY-RUN runs the
      (source-dir default-directory sd-p)
      (install-dir default-directory id-p)
      ;; (makefile "Makefile" makefile-p)
-     ;; (make-macros "" make-macros-p)
+     ;; (make-macros () make-macros-p)
      ;; (nologo t)
      (targets "")
      (dry-run nil)
@@ -856,7 +859,7 @@ runs the \\='cmake\\=' command without executing it."
 (cl-defun emc-unix-make-cmd (&key
 			     (build-dir default-directory bd-p)
                              (makefile "Makefile" makefile-p)
-                             (make-macros "" make-macros-p)
+                             (make-macros () make-macros-p)
                              (targets "")
 			     (dry-run nil)
                              &allow-other-keys)
@@ -2332,16 +2335,18 @@ the ancillary window."
 			 (macros (widget-value make-macros-widget))
 			 
 			 (cmdline
-			  (emc-craft-command system-type
-					     build-system
-					     :command cmd
-					     :source-dir src-dir
-					     :build-dir bin-dir
-					     :install-dir install-dir
-					     :makefile makefile
-					     :targets targets
-					     :make-macros macros
-					     ))
+			  (progn
+			    (emc--msg "Ms: %s" macros)
+			    (emc-craft-command system-type
+					       build-system
+					       :command cmd
+					       :source-dir src-dir
+					       :build-dir bin-dir
+					       :install-dir install-dir
+					       :makefile makefile
+					       :targets targets
+					       :make-macros macros
+					       )))
 			 )
 
 		    ;; (emc--msg "%s %s %s %s"
@@ -2379,7 +2384,7 @@ the ancillary window."
 			     :targets targets
 			     ))
 		  ))			; run-cmd
-	      )
+	      )				; cl-flet bindings
 
       ;; (widget-insert "Emacs Make Compile (EMC, or Emacs Master of Ceremonies)")
       (setq-local header-line-format (emc--header-line))
@@ -2524,17 +2529,68 @@ the ancillary window."
 		     )
 
       (widget-insert "\n")
+      ;; Old
+      ;; (setq make-macros-widget
+      ;; 	    (widget-create 'string
+      ;; 			   :value ""
+      ;; 			   :format "Macros          : %v"
+      ;; 			   :size emc--*emc-field-size*
+      ;; 			   :notify (lambda (w &rest ignore)
+      ;; 				     (ignore w ignore)
+      ;; 				     (save-excursion
+      ;; 				       (modify-cmd-widget ; (widget-value w)
+      ;; 					)))
+      ;; 			   ))
+      (widget-insert "Macros:\n")
       (setq make-macros-widget
-	    (widget-create 'string
-			   :value ""
-			   :format "Macros          : %v"
-			   :size emc--*emc-field-size*
-			   :notify (lambda (w &rest ignore)
-				     (ignore w ignore)
-				     (save-excursion
-				       (modify-cmd-widget ; (widget-value w)
-					)))
-			   ))
+	    (widget-create
+	     'editable-list
+	     :entry-format "%i%d %v"
+	     ;; :size emc--*emc-field-size*
+	     :insert-button-args
+	     '(:value "+" :tag "+" :button-suffix "")
+			   
+	     :delete-button-args
+	     '(:value "-" :tag "-" :button-prefix "")
+			   
+	     :append-button-args
+	     '(:value "+" :tag "+")
+
+	     :notify (lambda (w &rest args)
+		       (ignore w args)
+		       ;; (emc--msg "MDs: %s" (widget-value w))
+		       (modify-cmd-widget)
+		       )
+			   
+	     `(group
+	       :inline t
+	       :indent 0
+	       :format "%v"
+	       
+	       (editable-field
+		:format "%v "
+		:size ,(/ emc--*emc-field-size* 3)
+		:value ""
+		:tag "Macro "
+		:notify ,(lambda (w &rest args)
+			   (ignore w args)
+			   ;; (emc--msg "M: %s" (widget-value w))
+			   (modify-cmd-widget)
+			   )
+		)
+
+	       (editable-field
+		:format "%t: %v \n"
+		:size ,(floor (* emc--*emc-field-size* 0.75))
+		:value ""
+		:tag "Def"
+		:notify ,(lambda (w &rest args)
+			   (ignore w args)
+			   ;; (emc--msg "D: %s" (widget-value w))
+			   (modify-cmd-widget)
+			   )
+		)
+	       )))
       
       (widget-insert "\n")
       (setq targets-widget
